@@ -1,0 +1,1364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Compression Preview Studio</title>
+  <style>
+    :root {
+      --bg: #000000;
+      --panel: #050505;
+      --panel-alt: #0d0d0d;
+      --line: rgba(255, 255, 255, 0.08);
+      --line-strong: rgba(255, 255, 255, 0.14);
+      --text: #ffffff;
+      --muted: #9ca3af;
+      --dim: #6b7280;
+      --accent: #22d3ee;
+      --accent-strong: #67e8f9;
+      --accent-soft: rgba(34, 211, 238, 0.12);
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #fb7185;
+      --radius: 6px;
+      --header-height: 56px;
+      --tile-title-height: 32px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      --scrollbar-thumb: rgba(255, 255, 255, 0.12);
+      --scrollbar-track: rgba(255, 255, 255, 0.04);
+      background-size: 18px 18px;
+      background-repeat: repeat;
+      background-image: url("data:image/svg+xml,%3Csvg width='18' height='18' xmlns='http://www.w3.org/2000/svg'%3E%3Crect x='0' y='0' width='2' height='2' fill='rgba(255,255,255,0.03)' /%3E%3C/svg%3E");
+    }
+
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--scrollbar-track);
+      border-radius: 5px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb);
+      border-radius: 5px;
+    }
+
+    .playground-shell {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      height: 100dvh;
+      padding: 0 16px;
+    }
+
+    .playground-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      height: var(--header-height);
+      padding-top: 12px;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 1 1 0;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      display: inline-grid;
+      grid-template-columns: repeat(2, 8px);
+      grid-template-rows: repeat(2, 8px);
+      gap: 4px;
+      color: var(--accent);
+    }
+
+    .brand-mark span {
+      display: block;
+      width: 8px;
+      height: 8px;
+      background: currentColor;
+    }
+
+    .header-title {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .header-title strong {
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .header-title span {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.2;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .header-center {
+      flex: 1 1 0;
+      display: flex;
+      justify-content: center;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    .header-right {
+      flex: 1 1 0;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .header-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      white-space: nowrap;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--warning);
+    }
+
+    .status-dot.ok {
+      background: var(--success);
+    }
+
+    .status-dot.busy {
+      background: var(--accent);
+    }
+
+    .header-button,
+    .send-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 36px;
+      padding: 0 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
+    }
+
+    .header-button:hover:not(:disabled),
+    .send-button:hover:not(:disabled) {
+      border-color: var(--line-strong);
+    }
+
+    .header-button.primary,
+    .send-button {
+      color: var(--accent-strong);
+      border-color: rgba(34, 211, 238, 0.28);
+      background: rgba(34, 211, 238, 0.08);
+    }
+
+    .header-button.danger {
+      color: #fecdd3;
+      border-color: rgba(251, 113, 133, 0.22);
+    }
+
+    .header-button:disabled,
+    .send-button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .builder-layout {
+      display: flex;
+      gap: 16px;
+      width: 100%;
+      min-height: 0;
+      flex: 1 1 auto;
+      padding: 16px 0;
+    }
+
+    .tile {
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      color: var(--muted);
+      min-height: 0;
+    }
+
+    .tile-title {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: var(--tile-title-height);
+      padding: 0 12px;
+      border-bottom: 1px solid var(--line);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+
+    .tile-body {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
+      padding: 16px;
+      gap: 16px;
+    }
+
+    .preview-tile {
+      flex: 1 1 0;
+    }
+
+    .chat-tile {
+      flex: 1.2 1 0;
+    }
+
+    .settings-tile {
+      flex: 0 0 400px;
+      max-width: 400px;
+    }
+
+    .preview-center {
+      display: flex;
+      flex: 1 1 auto;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: #000;
+      min-height: 300px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .preview-center::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at center, rgba(34, 211, 238, 0.08), transparent 44%);
+      pointer-events: none;
+    }
+
+    .orb {
+      position: relative;
+      width: 152px;
+      height: 152px;
+      display: grid;
+      place-items: center;
+      z-index: 1;
+    }
+
+    .orb-ring {
+      position: absolute;
+      inset: 0;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      animation: spin 4s linear infinite;
+    }
+
+    .orb-ring.two {
+      inset: 14px;
+      animation-duration: 3.2s;
+      animation-direction: reverse;
+    }
+
+    .orb-ring.three {
+      inset: 28px;
+      animation-duration: 2.4s;
+      border-color: rgba(255, 255, 255, 0.05);
+    }
+
+    .orb-core {
+      width: 78px;
+      height: 78px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 35% 35%, #a5f3fc, #22d3ee 56%, #0f172a 100%);
+      box-shadow: 0 0 28px rgba(34, 211, 238, 0.2);
+      transition: background 140ms ease, box-shadow 140ms ease;
+    }
+
+    .orb[data-state="busy"] .orb-core {
+      background: radial-gradient(circle at 35% 35%, #bbf7d0, #10b981 56%, #052e2b 100%);
+      box-shadow: 0 0 28px rgba(16, 185, 129, 0.2);
+    }
+
+    .orb[data-state="compressing"] .orb-core {
+      background: radial-gradient(circle at 35% 35%, #fde68a, #f59e0b 56%, #422006 100%);
+      box-shadow: 0 0 28px rgba(245, 158, 11, 0.2);
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .preview-caption {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+      text-align: center;
+    }
+
+    .mini-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .mini-card {
+      display: grid;
+      gap: 6px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 12px;
+      background: var(--panel-alt);
+    }
+
+    .mini-card span {
+      color: var(--dim);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .mini-card strong {
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+
+    .chat-log {
+      overflow-y: auto;
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .empty-state {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 220px;
+      border: 1px dashed var(--line);
+      border-radius: 4px;
+      color: var(--dim);
+      font-size: 13px;
+      line-height: 1.55;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .message {
+      display: grid;
+      gap: 6px;
+      max-width: 80%;
+    }
+
+    .message.user {
+      align-self: flex-end;
+    }
+
+    .message.summary {
+      max-width: 100%;
+    }
+
+    .message-meta {
+      color: var(--dim);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .message-body {
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 12px 14px;
+      background: var(--panel-alt);
+      color: var(--text);
+      white-space: pre-wrap;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .message.user .message-body {
+      border-color: rgba(34, 211, 238, 0.22);
+      background: rgba(34, 211, 238, 0.08);
+      color: var(--text);
+    }
+
+    .message.summary .message-body {
+      border-color: rgba(245, 158, 11, 0.2);
+      background: rgba(245, 158, 11, 0.08);
+    }
+
+    .composer {
+      flex-shrink: 0;
+      display: grid;
+      gap: 10px;
+    }
+
+    .composer textarea {
+      min-height: 112px;
+    }
+
+    .composer-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .composer-note {
+      color: var(--dim);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .settings-scroll {
+      overflow-y: auto;
+      flex: 1 1 auto;
+      min-height: 0;
+      display: grid;
+      gap: 16px;
+    }
+
+    .section {
+      display: grid;
+      gap: 10px;
+    }
+
+    .section-label {
+      color: var(--dim);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .field {
+      display: grid;
+      gap: 8px;
+    }
+
+    .field label {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    input,
+    textarea,
+    select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: var(--panel-alt);
+      color: var(--text);
+      font: inherit;
+      font-size: 13px;
+      padding: 12px;
+      transition: border-color 140ms ease;
+    }
+
+    textarea {
+      min-height: 132px;
+      resize: vertical;
+      line-height: 1.5;
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus {
+      outline: none;
+      border-color: rgba(34, 211, 238, 0.28);
+    }
+
+    .summary-block,
+    .trace-block,
+    .runtime-block {
+      display: grid;
+      gap: 10px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 12px;
+      background: var(--panel-alt);
+    }
+
+    .summary-block p,
+    .trace-message,
+    .helper {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .trace-feed {
+      display: grid;
+      gap: 10px;
+      max-height: 260px;
+      overflow-y: auto;
+    }
+
+    .trace-item {
+      display: grid;
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.01);
+    }
+
+    .trace-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .trace-kind {
+      color: var(--accent);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .trace-time {
+      color: var(--dim);
+      font-size: 10px;
+    }
+
+    .trace-chips {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .trace-chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 24px;
+      padding: 0 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--dim);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    details {
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: var(--panel-alt);
+      overflow: hidden;
+    }
+
+    details summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 12px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    details summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .advanced-grid {
+      display: grid;
+      gap: 10px;
+      padding: 0 12px 12px;
+    }
+
+    @media (max-width: 1200px) {
+      .builder-layout {
+        flex-direction: column;
+      }
+
+      .preview-tile,
+      .chat-tile,
+      .settings-tile {
+        flex: auto;
+        max-width: none;
+      }
+
+      .preview-tile {
+        min-height: 420px;
+      }
+
+      .chat-tile {
+        min-height: 620px;
+      }
+
+      .settings-tile {
+        min-height: 520px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="playground-shell">
+    <header class="playground-header">
+      <div class="header-left">
+        <div class="brand-mark" aria-hidden="true">
+          <span></span>
+          <span></span>
+          <span></span>
+          <span style="background:white;"></span>
+        </div>
+        <div class="header-title">
+          <strong>ctx-cache-compressor</strong>
+          <span>Agent Playground</span>
+        </div>
+      </div>
+      <div class="header-center">Compression Preview Studio</div>
+      <div class="header-right">
+        <div class="header-status"><span id="health-dot" class="status-dot"></span><span id="health-text">service</span></div>
+        <div class="header-status"><span id="compression-dot" class="status-dot"></span><span id="compression-text">compression</span></div>
+        <button id="refresh-context" class="header-button" type="button">Refresh</button>
+        <button id="create-session" class="header-button primary" type="button">Connect</button>
+      </div>
+    </header>
+
+    <section class="builder-layout">
+      <section class="tile preview-tile">
+        <div class="tile-title">Preview</div>
+        <div class="tile-body">
+          <div class="preview-center">
+            <div id="preview-orb" class="orb" data-state="idle">
+              <div class="orb-ring"></div>
+              <div class="orb-ring two"></div>
+              <div class="orb-ring three"></div>
+              <div class="orb-core"></div>
+            </div>
+          </div>
+          <p id="preview-caption" class="preview-caption">Idle. Start a conversation to preview the stored session and watch compression behavior.</p>
+          <div class="mini-grid">
+            <div class="mini-card">
+              <span>Session</span>
+              <strong id="session-flag">Not created</strong>
+            </div>
+            <div class="mini-card">
+              <span>Latency</span>
+              <strong id="latency-badge">n/a</strong>
+            </div>
+            <div class="mini-card">
+              <span>Turns</span>
+              <strong id="turn-badge">0</strong>
+            </div>
+            <div class="mini-card">
+              <span>Messages</span>
+              <strong id="message-badge">0</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="tile chat-tile">
+        <div class="tile-title">Chat</div>
+        <div class="tile-body">
+          <div id="chat-log" class="chat-log">
+            <div class="empty-state">No session activity yet. Connect and send the first message to start the preview.</div>
+          </div>
+          <form id="composer-form" class="composer">
+            <textarea id="composer-input" placeholder="Type a message"></textarea>
+            <div class="composer-footer">
+              <div id="composer-note" class="composer-note">Enter sends. Shift+Enter inserts a newline.</div>
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button id="jump-latest" class="header-button" type="button">Latest</button>
+                <button id="send-button" class="send-button" type="submit">Send</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="tile settings-tile">
+        <div class="tile-title">Session</div>
+        <div class="tile-body settings-scroll">
+          <section class="section">
+            <div class="section-label">Identity</div>
+            <div class="field">
+              <label for="session-id">Session ID</label>
+              <input id="session-id" placeholder="auto-create on first send">
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button id="delete-session" class="header-button danger" type="button">Delete</button>
+              <button id="reset-local" class="header-button" type="button">Reset</button>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-label">Prompt</div>
+            <div class="field">
+              <label for="system-prompt">System Prompt</label>
+              <textarea id="system-prompt"></textarea>
+            </div>
+          </section>
+
+          <section class="runtime-block">
+            <div class="section-label">Runtime</div>
+            <div class="mini-grid">
+              <div class="mini-card">
+                <span>Model</span>
+                <strong id="cfg-model">loading</strong>
+              </div>
+              <div class="mini-card">
+                <span>Compress Every</span>
+                <strong id="cfg-every-turns">-</strong>
+              </div>
+              <div class="mini-card">
+                <span>Keep Recent</span>
+                <strong id="cfg-keep-recent">-</strong>
+              </div>
+              <div class="mini-card">
+                <span>TTL / Max</span>
+                <strong id="cfg-capacity">-</strong>
+              </div>
+            </div>
+          </section>
+
+          <section class="summary-block">
+            <div class="section-label">Summary</div>
+            <p id="summary-preview">No summary injected yet.</p>
+          </section>
+
+          <section class="trace-block">
+            <div class="section-label">Recent Trace</div>
+            <div id="trace-feed" class="trace-feed">
+              <div class="trace-item">
+                <div class="trace-head">
+                  <div class="trace-kind">waiting_for_events</div>
+                  <div class="trace-time">now</div>
+                </div>
+                <p class="trace-message">Send a message to populate the latest session events.</p>
+                <div class="trace-chips">
+                  <div class="trace-chip">turns 0</div>
+                  <div class="trace-chip">stable 0</div>
+                  <div class="trace-chip">pending 0</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="stats-grid">
+            <div class="stat-card">
+              <span>Token Estimate</span>
+              <strong id="stat-tokens">0</strong>
+            </div>
+            <div class="stat-card">
+              <span>Compressed Turns</span>
+              <strong id="stat-compressed">0</strong>
+            </div>
+            <div class="stat-card">
+              <span>Stable Buffer</span>
+              <strong id="stat-stable">0</strong>
+            </div>
+            <div class="stat-card">
+              <span>Pending Buffer</span>
+              <strong id="stat-pending">0</strong>
+            </div>
+            <div class="stat-card">
+              <span>Last Trigger</span>
+              <strong id="stat-trigger">never</strong>
+            </div>
+            <div class="stat-card">
+              <span>Last Finish</span>
+              <strong id="stat-finish">never</strong>
+            </div>
+          </section>
+
+          <details>
+            <summary>Advanced</summary>
+            <div class="advanced-grid">
+              <div class="field">
+                <label for="api-base">API Base</label>
+                <input id="api-base" value="">
+              </div>
+              <div class="field">
+                <label for="poll-interval">Poll Interval</label>
+                <select id="poll-interval">
+                  <option value="800">800 ms</option>
+                  <option value="1200" selected>1200 ms</option>
+                  <option value="2000">2000 ms</option>
+                  <option value="3500">3500 ms</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="auto-refresh">Auto Refresh</label>
+                <select id="auto-refresh">
+                  <option value="on" selected>On</option>
+                  <option value="off">Off</option>
+                </select>
+              </div>
+            </div>
+          </details>
+
+          <p id="config-note" class="helper">The preview uses the same server session for append, completion, and compression tracking.</p>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    const state = {
+      apiBase: window.location.origin,
+      sessionId: "",
+      systemPrompt: "",
+      context: null,
+      lastLatencyMs: null,
+      autoRefresh: true,
+      pollIntervalMs: 1200,
+      pollTimer: null,
+      isSending: false,
+      health: null,
+      config: null
+    };
+
+    const els = {
+      apiBase: document.getElementById("api-base"),
+      sessionId: document.getElementById("session-id"),
+      systemPrompt: document.getElementById("system-prompt"),
+      pollInterval: document.getElementById("poll-interval"),
+      autoRefresh: document.getElementById("auto-refresh"),
+      createSession: document.getElementById("create-session"),
+      deleteSession: document.getElementById("delete-session"),
+      refreshContext: document.getElementById("refresh-context"),
+      resetLocal: document.getElementById("reset-local"),
+      jumpLatest: document.getElementById("jump-latest"),
+      cfgModel: document.getElementById("cfg-model"),
+      cfgEveryTurns: document.getElementById("cfg-every-turns"),
+      cfgKeepRecent: document.getElementById("cfg-keep-recent"),
+      cfgCapacity: document.getElementById("cfg-capacity"),
+      configNote: document.getElementById("config-note"),
+      healthDot: document.getElementById("health-dot"),
+      healthText: document.getElementById("health-text"),
+      compressionDot: document.getElementById("compression-dot"),
+      compressionText: document.getElementById("compression-text"),
+      previewOrb: document.getElementById("preview-orb"),
+      previewCaption: document.getElementById("preview-caption"),
+      sessionFlag: document.getElementById("session-flag"),
+      turnBadge: document.getElementById("turn-badge"),
+      messageBadge: document.getElementById("message-badge"),
+      latencyBadge: document.getElementById("latency-badge"),
+      chatLog: document.getElementById("chat-log"),
+      composerForm: document.getElementById("composer-form"),
+      composerInput: document.getElementById("composer-input"),
+      composerNote: document.getElementById("composer-note"),
+      sendButton: document.getElementById("send-button"),
+      statTokens: document.getElementById("stat-tokens"),
+      statCompressed: document.getElementById("stat-compressed"),
+      statStable: document.getElementById("stat-stable"),
+      statPending: document.getElementById("stat-pending"),
+      statTrigger: document.getElementById("stat-trigger"),
+      statFinish: document.getElementById("stat-finish"),
+      summaryPreview: document.getElementById("summary-preview"),
+      traceFeed: document.getElementById("trace-feed")
+    };
+
+    function endpoint(path) {
+      return `${state.apiBase.replace(/\/$/, "")}${path}`;
+    }
+
+    async function apiFetch(path, options = {}) {
+      const response = await fetch(endpoint(path), {
+        headers: {
+          "Content-Type": "application/json",
+          ...(options.headers || {})
+        },
+        ...options
+      });
+
+      const contentType = response.headers.get("content-type") || "";
+      const isJson = contentType.includes("application/json");
+      const body = isJson ? await response.json() : await response.text();
+
+      if (!response.ok) {
+        const message = isJson && body && body.error ? body.error : String(body || response.statusText);
+        throw new Error(message);
+      }
+
+      return body;
+    }
+
+    function formatTime(value) {
+      if (!value) return "never";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return value;
+      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+    }
+
+    function messageText(message) {
+      if (!message || message.content == null) return "";
+      if (typeof message.content === "string") return message.content;
+      if (Array.isArray(message.content)) {
+        return message.content
+          .map((part) => part && part.text ? part.text : "")
+          .filter(Boolean)
+          .join("\n");
+      }
+      return "";
+    }
+
+    function currentMode() {
+      if (state.isSending) return "busy";
+      if (state.context && state.context.is_compressing) return "compressing";
+      return "idle";
+    }
+
+    function syncInputsFromState() {
+      els.apiBase.value = state.apiBase;
+      els.sessionId.value = state.sessionId;
+      els.systemPrompt.value = state.systemPrompt;
+      els.pollInterval.value = String(state.pollIntervalMs);
+      els.autoRefresh.value = state.autoRefresh ? "on" : "off";
+    }
+
+    function setBusy(isBusy, note = "") {
+      state.isSending = isBusy;
+      els.sendButton.disabled = isBusy;
+      els.createSession.disabled = isBusy;
+      els.deleteSession.disabled = isBusy;
+      els.refreshContext.disabled = isBusy;
+      els.resetLocal.disabled = isBusy;
+      els.composerInput.disabled = isBusy;
+      els.composerNote.textContent = note || (isBusy ? "Running server-side chat completion..." : "Enter sends. Shift+Enter inserts a newline.");
+      renderHeaderState();
+      renderPreviewState();
+    }
+
+    function renderHealth() {
+      const ok = state.health && state.health.status === "ok";
+      els.healthDot.className = `status-dot ${ok ? "ok" : ""}`;
+      els.healthText.textContent = ok ? `service ok · ${state.health.sessions}` : "service unavailable";
+    }
+
+    function renderHeaderState() {
+      const mode = currentMode();
+      els.compressionDot.className = `status-dot ${mode === "compressing" || mode === "busy" ? "busy" : state.context ? "ok" : ""}`;
+      els.compressionText.textContent =
+        mode === "compressing"
+          ? "compression active"
+          : mode === "busy"
+            ? "request in flight"
+            : "compression idle";
+
+      els.sessionFlag.textContent = state.sessionId ? state.sessionId.slice(0, 12) : "Not created";
+      els.turnBadge.textContent = state.context ? String(state.context.turn_count) : "0";
+      els.messageBadge.textContent = state.context ? String(state.context.messages.length) : "0";
+      els.latencyBadge.textContent = state.lastLatencyMs == null ? "n/a" : `${state.lastLatencyMs} ms`;
+      els.createSession.textContent = state.sessionId ? "New Session" : "Connect";
+    }
+
+    function renderPreviewState() {
+      const mode = currentMode();
+      const context = state.context;
+      els.previewOrb.dataset.state = mode;
+
+      if (mode === "compressing") {
+        els.previewCaption.textContent = "Compression is active. The preview still shows the latest session view.";
+      } else if (mode === "busy") {
+        els.previewCaption.textContent = "Waiting for the upstream model. The assistant reply will be appended back into the same session.";
+      } else if (context && context.summary_message_count > 0) {
+        els.previewCaption.textContent = "Older turns have already been summarized. Keep chatting to trigger the next cycle.";
+      } else if (state.sessionId) {
+        els.previewCaption.textContent = "Session is live. Keep going until enough completed turns accumulate for compression.";
+      } else {
+        els.previewCaption.textContent = "Idle. Start a conversation to preview the stored session and watch compression behavior.";
+      }
+    }
+
+    function renderConfig() {
+      if (!state.config) return;
+      els.cfgModel.textContent = state.config.llm_model;
+      els.cfgEveryTurns.textContent = `${state.config.compression_every_n_turns} turns`;
+      els.cfgKeepRecent.textContent = `${state.config.keep_recent_turns} turns`;
+      els.cfgCapacity.textContent = `${state.config.session_ttl_seconds}s / ${state.config.max_sessions}`;
+      els.configNote.textContent = `Upstream base ${state.config.llm_base_url}. Timeout ${state.config.llm_timeout_seconds}s.`;
+    }
+
+    function renderMessages() {
+      const context = state.context;
+      if (!context || !Array.isArray(context.messages) || context.messages.length === 0) {
+        els.chatLog.innerHTML = '<div class="empty-state">No session activity yet. Connect and send the first message to start the preview.</div>';
+        return;
+      }
+
+      const visibleMessages = context.messages.filter((message) => {
+        const text = messageText(message);
+        const isSummary = message.role === "system" && text.startsWith("[CONTEXT SUMMARY]");
+        return message.role === "user" || message.role === "assistant" || isSummary;
+      });
+
+      if (visibleMessages.length === 0) {
+        els.chatLog.innerHTML = '<div class="empty-state">No visible transcript messages yet.</div>';
+        return;
+      }
+
+      const html = visibleMessages.map((message) => {
+        const text = messageText(message);
+        const isSummary = message.role === "system" && text.startsWith("[CONTEXT SUMMARY]");
+        const role = isSummary ? "summary" : message.role;
+        const label = isSummary ? "context summary" : role;
+
+        return `
+          <article class="message ${role}">
+            <div class="message-meta">${escapeHtml(label)}</div>
+            <div class="message-body">${escapeHtml(text || "(empty content)")}</div>
+          </article>
+        `;
+      }).join("");
+
+      els.chatLog.innerHTML = html;
+    }
+
+    function renderStats() {
+      const context = state.context;
+      els.statTokens.textContent = context ? String(context.token_estimate) : "0";
+      els.statCompressed.textContent = context ? String(context.compressed_turns) : "0";
+      els.statStable.textContent = context ? String(context.stable_message_count) : "0";
+      els.statPending.textContent = context ? String(context.pending_message_count) : "0";
+      els.statTrigger.textContent = context ? formatTime(context.last_compression_triggered_at) : "never";
+      els.statFinish.textContent = context ? formatTime(context.last_compression_finished_at) : "never";
+      els.summaryPreview.textContent = context && context.latest_summary_preview
+        ? context.latest_summary_preview
+        : "No summary injected yet.";
+    }
+
+    function renderTraces() {
+      const traces = state.context && Array.isArray(state.context.traces)
+        ? [...state.context.traces].reverse().slice(0, 12)
+        : [];
+
+      if (traces.length === 0) {
+        els.traceFeed.innerHTML = `
+          <div class="trace-item">
+            <div class="trace-head">
+              <div class="trace-kind">waiting_for_events</div>
+              <div class="trace-time">now</div>
+            </div>
+            <p class="trace-message">Send a message to populate the latest session events.</p>
+            <div class="trace-chips">
+              <div class="trace-chip">turns 0</div>
+              <div class="trace-chip">stable 0</div>
+              <div class="trace-chip">pending 0</div>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      els.traceFeed.innerHTML = traces.map((trace) => `
+        <article class="trace-item">
+          <div class="trace-head">
+            <div class="trace-kind">${escapeHtml(trace.kind)}</div>
+            <div class="trace-time">${escapeHtml(formatTime(trace.at))}</div>
+          </div>
+          <p class="trace-message">${escapeHtml(trace.message || "")}</p>
+          <div class="trace-chips">
+            <div class="trace-chip">turns ${trace.turn_count}</div>
+            <div class="trace-chip">stable ${trace.stable_count}</div>
+            <div class="trace-chip">pending ${trace.pending_count}</div>
+          </div>
+        </article>
+      `).join("");
+    }
+
+    function renderAll() {
+      syncInputsFromState();
+      renderHealth();
+      renderHeaderState();
+      renderPreviewState();
+      renderConfig();
+      renderMessages();
+      renderStats();
+      renderTraces();
+    }
+
+    async function loadHealth() {
+      try {
+        state.health = await apiFetch("/health");
+      } catch (error) {
+        state.health = null;
+        console.error(error);
+      }
+      renderAll();
+    }
+
+    async function loadDemoConfig() {
+      state.config = await apiFetch("/demo/config");
+      if (!state.systemPrompt) {
+        state.systemPrompt = state.config.default_system_prompt;
+      }
+      if (!state.pollIntervalMs) {
+        state.pollIntervalMs = state.config.recommended_poll_interval_ms;
+      }
+      renderAll();
+    }
+
+    async function createSession() {
+      const prompt = els.systemPrompt.value.trim();
+      const body = {};
+      if (prompt) body.system_prompt = prompt;
+
+      const response = await apiFetch("/sessions", {
+        method: "POST",
+        body: JSON.stringify(body)
+      });
+      state.sessionId = response.session_id;
+      await refreshContext();
+    }
+
+    async function deleteSession() {
+      const candidateId = els.sessionId.value.trim() || state.sessionId;
+      if (!candidateId) return;
+      await apiFetch(`/sessions/${encodeURIComponent(candidateId)}`, { method: "DELETE" });
+      state.sessionId = "";
+      state.context = null;
+      state.lastLatencyMs = null;
+      renderAll();
+    }
+
+    async function refreshContext() {
+      const candidateId = els.sessionId.value.trim() || state.sessionId;
+      if (!candidateId) {
+        state.context = null;
+        renderAll();
+        return;
+      }
+
+      state.apiBase = els.apiBase.value.trim() || window.location.origin;
+      state.sessionId = candidateId;
+
+      try {
+        state.context = await apiFetch(`/sessions/${encodeURIComponent(candidateId)}/context`);
+      } catch (error) {
+        console.error(error);
+      }
+      renderAll();
+    }
+
+    async function sendMessage() {
+      const userMessage = els.composerInput.value.trim();
+      if (!userMessage || state.isSending) return;
+
+      state.apiBase = els.apiBase.value.trim() || window.location.origin;
+      state.systemPrompt = els.systemPrompt.value;
+      state.pollIntervalMs = Number(els.pollInterval.value) || 1200;
+      state.autoRefresh = els.autoRefresh.value === "on";
+
+      setBusy(true);
+      try {
+        const response = await apiFetch("/demo/chat", {
+          method: "POST",
+          body: JSON.stringify({
+            session_id: els.sessionId.value.trim() || null,
+            system_prompt: state.systemPrompt,
+            user_message: userMessage
+          })
+        });
+
+        state.sessionId = response.session_id;
+        state.context = response.context;
+        state.lastLatencyMs = response.completion_latency_ms;
+        els.composerInput.value = "";
+        renderAll();
+        jumpToLatest();
+      } catch (error) {
+        console.error(error);
+        alert(error.message);
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    function resetLocalView() {
+      state.sessionId = "";
+      state.context = null;
+      state.lastLatencyMs = null;
+      els.composerInput.value = "";
+      renderAll();
+    }
+
+    function jumpToLatest() {
+      els.chatLog.scrollTop = els.chatLog.scrollHeight;
+    }
+
+    function schedulePolling() {
+      window.clearTimeout(state.pollTimer);
+      if (!state.autoRefresh || !state.sessionId) return;
+
+      state.pollTimer = window.setTimeout(async () => {
+        try {
+          await refreshContext();
+        } finally {
+          schedulePolling();
+        }
+      }, state.pollIntervalMs);
+    }
+
+    els.createSession.addEventListener("click", async () => {
+      if (state.sessionId && !els.sessionId.value.trim()) {
+        resetLocalView();
+      }
+      setBusy(true, "Creating session...");
+      try {
+        state.apiBase = els.apiBase.value.trim() || window.location.origin;
+        state.systemPrompt = els.systemPrompt.value;
+        await createSession();
+      } catch (error) {
+        console.error(error);
+        alert(error.message);
+      } finally {
+        setBusy(false);
+        schedulePolling();
+      }
+    });
+
+    els.deleteSession.addEventListener("click", async () => {
+      setBusy(true, "Deleting session...");
+      try {
+        await deleteSession();
+      } catch (error) {
+        console.error(error);
+        alert(error.message);
+      } finally {
+        setBusy(false);
+        schedulePolling();
+      }
+    });
+
+    els.refreshContext.addEventListener("click", async () => {
+      setBusy(true, "Refreshing context...");
+      try {
+        await refreshContext();
+      } catch (error) {
+        console.error(error);
+        alert(error.message);
+      } finally {
+        setBusy(false);
+        schedulePolling();
+      }
+    });
+
+    els.resetLocal.addEventListener("click", () => {
+      resetLocalView();
+      schedulePolling();
+    });
+
+    els.jumpLatest.addEventListener("click", jumpToLatest);
+
+    els.pollInterval.addEventListener("change", () => {
+      state.pollIntervalMs = Number(els.pollInterval.value) || 1200;
+      schedulePolling();
+    });
+
+    els.autoRefresh.addEventListener("change", () => {
+      state.autoRefresh = els.autoRefresh.value === "on";
+      schedulePolling();
+      renderAll();
+    });
+
+    els.composerForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      await sendMessage();
+      schedulePolling();
+    });
+
+    els.composerInput.addEventListener("keydown", async (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        await sendMessage();
+        schedulePolling();
+      }
+    });
+
+    async function boot() {
+      state.apiBase = window.location.origin;
+      syncInputsFromState();
+      await Promise.all([loadHealth(), loadDemoConfig()]);
+      schedulePolling();
+      window.setInterval(loadHealth, 5000);
+    }
+
+    boot().catch((error) => {
+      console.error(error);
+      alert(`Dashboard bootstrap failed: ${error.message}`);
+    });
+  </script>
+</body>
+</html>

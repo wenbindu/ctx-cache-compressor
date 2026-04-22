@@ -1,0 +1,24 @@
+[server]
+host = "0.0.0.0"
+port = 8080
+max_sessions = 10000
+session_ttl_seconds = 3600
+session_cleanup_interval_seconds = 30
+
+[compression]
+every_n_turns = 5
+keep_recent_turns = 2
+llm_timeout_seconds = 20
+max_retries = 1
+warn_on_failure = true
+
+[llm]
+base_url = "https://your-openai-compatible-endpoint/v1"
+api_key = ""
+model = "your-fast-summary-model"
+max_tokens = 768
+temperature = 0.2
+
+[token_estimation]
+chars_per_token = 3
+

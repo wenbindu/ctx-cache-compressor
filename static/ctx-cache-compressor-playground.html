@@ -1,0 +1,2793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ctx-cache-compressor Demo Console</title>
+  <style>
+    :root {
+      --bg: #000000;
+      --panel: #050505;
+      --panel-alt: #0d0d0d;
+      --panel-soft: #111111;
+      --line: rgba(255, 255, 255, 0.08);
+      --line-strong: rgba(255, 255, 255, 0.14);
+      --text: #ffffff;
+      --muted: #9ca3af;
+      --muted-strong: #d1d5db;
+      --dim: #6b7280;
+      --accent: #22d3ee;
+      --accent-strong: #67e8f9;
+      --accent-soft: rgba(34, 211, 238, 0.12);
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #fb7185;
+      --radius: 6px;
+      --header-height: 56px;
+      --tile-title-height: 32px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow: hidden;
+    }
+
+    body {
+      --scrollbar-thumb: rgba(255, 255, 255, 0.12);
+      --scrollbar-track: rgba(255, 255, 255, 0.04);
+      width: 100%;
+      height: 100%;
+      background-size: 18px 18px;
+      background-repeat: repeat;
+      background-image: url("data:image/svg+xml,%3Csvg width='18' height='18' xmlns='http://www.w3.org/2000/svg'%3E%3Crect x='0' y='0' width='2' height='2' fill='rgba(255,255,255,0.03)' /%3E%3C/svg%3E");
+    }
+
+    button,
+    textarea,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--scrollbar-track);
+      border-radius: 5px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb);
+      border-radius: 5px;
+    }
+
+    .playground-shell {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      height: 100vh;
+      height: 100dvh;
+      max-height: 100dvh;
+      padding: 8px 14px 10px;
+      overflow: hidden;
+    }
+
+    .playground-shell.compact-mode .playground-layout {
+      grid-template-columns: minmax(360px, 412px) minmax(0, 1fr) minmax(312px, 348px);
+      grid-template-rows: minmax(0, 1fr);
+      grid-template-areas: "left chat right";
+    }
+
+    .playground-shell.compact-mode .bottom-grid {
+      display: none;
+    }
+
+    .playground-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      height: var(--header-height);
+      min-height: var(--header-height);
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 1 1 0;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      display: inline-grid;
+      grid-template-columns: repeat(2, 8px);
+      grid-template-rows: repeat(2, 8px);
+      gap: 4px;
+      color: var(--accent);
+    }
+
+    .brand-mark span {
+      display: block;
+      width: 8px;
+      height: 8px;
+      background: currentColor;
+    }
+
+    .header-title {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .header-title strong {
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .header-title span {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.2;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .header-center {
+      flex: 1 1 0;
+      display: flex;
+      justify-content: center;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    .header-right {
+      flex: 1 1 0;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      min-width: 0;
+      flex-wrap: wrap;
+    }
+
+    .locale-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding-right: 4px;
+    }
+
+    .locale-button {
+      min-height: 28px;
+      padding: 0 10px;
+    }
+
+    .locale-button.active {
+      color: var(--accent-strong);
+      border-color: rgba(34, 211, 238, 0.24);
+      background: rgba(34, 211, 238, 0.1);
+    }
+
+    .header-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      white-space: nowrap;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--warning);
+    }
+
+    .status-dot.ok {
+      background: var(--success);
+    }
+
+    .status-dot.busy {
+      background: var(--accent);
+    }
+
+    .header-button,
+    .icon-button,
+    .connect-button,
+    .send-button,
+    .metric-switch,
+    .mini-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 36px;
+      padding: 0 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: transparent;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+      transition: border-color 140ms ease, color 140ms ease, background 140ms ease, transform 140ms ease;
+    }
+
+    .header-button:hover:not(:disabled),
+    .icon-button:hover:not(:disabled),
+    .connect-button:hover:not(:disabled),
+    .send-button:hover:not(:disabled),
+    .metric-switch:hover:not(:disabled),
+    .mini-button:hover:not(:disabled) {
+      border-color: var(--line-strong);
+    }
+
+    .header-button.primary,
+    .connect-button,
+    .send-button,
+    .metric-switch.active {
+      color: var(--accent-strong);
+      border-color: rgba(34, 211, 238, 0.28);
+      background: rgba(34, 211, 238, 0.08);
+    }
+
+    .icon-button {
+      background: #101010;
+      border-color: rgba(255, 255, 255, 0.08);
+      color: #f3f4f6;
+      font-weight: 500;
+    }
+
+    .mini-button {
+      min-height: 28px;
+      padding: 0 10px;
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--muted-strong);
+      font-size: 11px;
+    }
+
+    .connect-button {
+      background: rgba(34, 211, 238, 0.14);
+      color: #d7fbff;
+      font-weight: 600;
+    }
+
+    .connect-button:hover:not(:disabled) {
+      transform: translateY(-1px);
+    }
+
+    .header-button.danger {
+      color: #fecdd3;
+      border-color: rgba(251, 113, 133, 0.22);
+    }
+
+    .header-button:disabled,
+    .icon-button:disabled,
+    .connect-button:disabled,
+    .send-button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .playground-layout {
+      display: grid;
+      grid-template-columns: minmax(360px, 412px) minmax(0, 1fr) minmax(312px, 348px);
+      grid-template-rows: minmax(0, 1fr);
+      grid-template-areas: "left chat right";
+      gap: 10px;
+      width: 100%;
+      flex: 1 1 auto;
+      min-height: 0;
+      padding-top: 8px;
+      overflow: hidden;
+    }
+
+    .left-rail,
+    .right-rail {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .left-rail > .tile,
+    .right-rail > .tile {
+      flex: 1 1 auto;
+      height: 100%;
+    }
+
+    .left-rail {
+      grid-area: left;
+      display: flex;
+    }
+
+    .right-rail {
+      grid-area: right;
+    }
+
+    .bottom-grid {
+      grid-area: bottom;
+      display: none;
+      grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+      gap: 16px;
+      min-height: 0;
+    }
+
+    .tile {
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      color: var(--muted);
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .tile.dark {
+      background: #030303;
+    }
+
+    .tile.settings {
+      background: #060606;
+    }
+
+    .tile-title {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: var(--tile-title-height);
+      padding: 0 12px;
+      border-bottom: 1px solid var(--line);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+
+    .tile-body {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
+      padding: 10px;
+      gap: 8px;
+    }
+
+    .chat-tile,
+    .overview-tile,
+    .memory-tile,
+    .runtime-tile,
+    .controls-tile,
+    .timeline-tile,
+    .trace-tile {
+      min-height: 0;
+    }
+
+    .chat-tile {
+      grid-area: chat;
+      overflow: hidden;
+    }
+
+    .left-rail .tile-body,
+    .right-rail .tile-body {
+      gap: 8px;
+    }
+
+    .chat-stage {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      gap: 8px;
+      min-height: 0;
+      flex: 1 1 auto;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .chat-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, rgba(34, 211, 238, 0.06), rgba(34, 211, 238, 0.01));
+      padding: 9px 10px;
+      flex-shrink: 0;
+    }
+
+    .chat-banner-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .chat-banner-copy strong {
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .chat-banner-copy span {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .live-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 11px;
+      border-radius: 999px;
+      border: 1px solid rgba(34, 211, 238, 0.16);
+      color: var(--accent-strong);
+      background: rgba(34, 211, 238, 0.08);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      white-space: nowrap;
+    }
+
+    .chat-log {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow-y: auto;
+      min-height: 0;
+      padding-right: 6px;
+      padding-bottom: 6px;
+      overscroll-behavior: contain;
+    }
+
+    .message {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-width: 88%;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: var(--panel-alt);
+      align-self: flex-start;
+    }
+
+    .message.user {
+      align-self: flex-end;
+      background: rgba(34, 211, 238, 0.08);
+      border-color: rgba(34, 211, 238, 0.18);
+    }
+
+    .message.summary {
+      max-width: 100%;
+      border-style: dashed;
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .message-meta {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .message-body {
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .empty-state {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 120px;
+      border: 1px dashed var(--line);
+      border-radius: var(--radius);
+      color: var(--dim);
+      font-size: 13px;
+      text-align: center;
+      padding: 16px;
+    }
+
+    .composer {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      position: sticky;
+      bottom: 0;
+      flex-shrink: 0;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      background: linear-gradient(180deg, rgba(5, 5, 5, 0), rgba(5, 5, 5, 0.92) 20px, #050505 100%);
+      z-index: 1;
+    }
+
+    .composer textarea,
+    .field textarea,
+    .field input,
+    .field select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #090909;
+      color: var(--text);
+      outline: none;
+      transition: border-color 140ms ease, background 140ms ease;
+    }
+
+    .composer textarea,
+    .field textarea {
+      min-height: 60px;
+      padding: 9px 11px;
+      resize: none;
+    }
+
+    .field input,
+    .field select {
+      min-height: 34px;
+      padding: 0 10px;
+      font-size: 12px;
+    }
+
+    .field select[multiple] {
+      min-height: 132px;
+      padding: 8px 10px;
+    }
+
+    .field textarea {
+      font-size: 12px;
+    }
+
+    .composer textarea:focus,
+    .field textarea:focus,
+    .field input:focus,
+    .field select:focus {
+      border-color: rgba(34, 211, 238, 0.28);
+    }
+
+    .composer-footer,
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .composer-note,
+    .helper {
+      color: var(--dim);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .preview-stage {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 132px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background:
+        radial-gradient(circle at 18% 16%, rgba(34, 211, 238, 0.16), transparent 38%),
+        linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+      padding: 12px;
+      overflow: hidden;
+    }
+
+    .preview-stage-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .session-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .preview-kicker {
+      color: var(--muted);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .preview-value {
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.4;
+      letter-spacing: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
+
+    .preview-stat {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .preview-stat span {
+      color: var(--muted);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .preview-stat strong {
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0;
+    }
+
+    .preview-copy {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .settings-scroll {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 0;
+      overflow-y: auto;
+      width: 100%;
+      padding-right: 4px;
+      overscroll-behavior: contain;
+    }
+
+    .monitor-scroll {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 0;
+      overflow-y: auto;
+      width: 100%;
+      padding-right: 4px;
+      overscroll-behavior: contain;
+    }
+
+    .config-section {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: 100%;
+    }
+
+    .config-section h3 {
+      margin: 0;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+    }
+
+    .config-rows {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .config-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-height: 26px;
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .config-row:last-child {
+      border-bottom: 0;
+    }
+
+    .config-row span {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .config-row strong {
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 600;
+      text-align: right;
+      word-break: break-word;
+    }
+
+    .config-row .chip {
+      margin-left: auto;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .settings-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .field-hint {
+      color: var(--dim);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .session-list {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #090909;
+      color: var(--text);
+      outline: none;
+    }
+
+    .hero-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background:
+        radial-gradient(circle at top left, rgba(34, 211, 238, 0.14), transparent 40%),
+        linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .hero-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .hero-label {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .hero-value {
+      color: var(--text);
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .hero-caption {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .flow-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .flow-step {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel-alt);
+      transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+    }
+
+    .flow-step.active {
+      border-color: rgba(34, 211, 238, 0.24);
+      background: linear-gradient(180deg, rgba(34, 211, 238, 0.08), rgba(34, 211, 238, 0.02));
+    }
+
+    .flow-step-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .flow-step-head strong {
+      color: var(--text);
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .flow-step-head span {
+      color: var(--dim);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .flow-path {
+      color: var(--accent-strong);
+      font-size: 12px;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+
+    .flow-note {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .flow-meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .metric-card {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel-alt);
+    }
+
+    .metric-card span {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .metric-card strong {
+      color: var(--text);
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .metric-card small {
+      color: var(--dim);
+      font-size: 12px;
+    }
+
+    .timeline-toolbar {
+      display: flex;
+      gap: 4px;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      padding-bottom: 2px;
+      scrollbar-width: thin;
+    }
+
+    .timeline-toolbar .metric-switch {
+      min-height: 34px;
+      padding: 0 11px;
+      font-size: 12px;
+      white-space: nowrap;
+      flex: 0 0 auto;
+    }
+
+    .timeline-stage {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 0;
+      flex: 1 1 auto;
+    }
+
+    .chart-frame {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 124px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background:
+        linear-gradient(180deg, rgba(34, 211, 238, 0.03), transparent 35%),
+        var(--panel-alt);
+      overflow: hidden;
+    }
+
+    .chart-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 100% 25%, 12.5% 100%;
+      pointer-events: none;
+    }
+
+    .chart-svg {
+      width: 100%;
+      height: 124px;
+      display: block;
+    }
+
+    .chart-path {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      filter: drop-shadow(0 0 10px rgba(34, 211, 238, 0.18));
+    }
+
+    .chart-area {
+      fill: url(#chart-area-gradient);
+    }
+
+    .chart-dots circle {
+      fill: var(--accent-strong);
+      stroke: #001116;
+      stroke-width: 2;
+    }
+
+    .chart-summary {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .summary-stat {
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel-alt);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .summary-stat span {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .summary-stat strong {
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .summary-scroll,
+    .trace-feed {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+      min-height: 0;
+      padding-right: 4px;
+    }
+
+    .memory-stage {
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .summary-preview {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel-alt);
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.6;
+      padding: 14px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      min-height: 132px;
+    }
+
+    .buffer-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .buffer-meter {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel-alt);
+    }
+
+    .buffer-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .buffer-row span {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .buffer-row strong {
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .buffer-track {
+      position: relative;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+      overflow: hidden;
+    }
+
+    .buffer-fill {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 0;
+      border-radius: 999px;
+      transition: width 180ms ease;
+    }
+
+    .buffer-fill.stable {
+      background: linear-gradient(90deg, rgba(34, 211, 238, 0.95), rgba(34, 211, 238, 0.4));
+    }
+
+    .buffer-fill.pending {
+      background: linear-gradient(90deg, rgba(245, 158, 11, 0.95), rgba(245, 158, 11, 0.4));
+    }
+
+    .trace-item {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel-alt);
+    }
+
+    .trace-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .trace-kind {
+      color: var(--text);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+    }
+
+    .trace-time {
+      color: var(--dim);
+      font-size: 11px;
+    }
+
+    .trace-message {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .trace-chips {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .trace-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 5px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      color: var(--dim);
+      font-size: 11px;
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .section {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .section-label {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .field label {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .advanced-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .advanced-section,
+    #reset-local {
+      display: none;
+    }
+
+    .chip-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .chip.active {
+      color: var(--accent-strong);
+      border-color: rgba(34, 211, 238, 0.18);
+      background: rgba(34, 211, 238, 0.08);
+    }
+
+    .helper.error {
+      color: #fca5a5;
+    }
+
+    @media (max-width: 1180px) {
+      .playground-layout {
+        grid-template-columns: minmax(0, 1fr) minmax(320px, 360px);
+        grid-template-rows: auto auto;
+        grid-template-areas:
+          "chat right"
+          "left right";
+      }
+    }
+
+    @media (max-width: 860px) {
+      .header-center {
+        display: none;
+      }
+
+      .playground-shell {
+        height: auto;
+        max-height: none;
+        min-height: 100dvh;
+        padding: 8px 12px 12px;
+        overflow: visible;
+      }
+
+      .playground-layout {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas:
+          "left"
+          "chat"
+          "right";
+        overflow: visible;
+      }
+
+      .advanced-grid,
+      .chart-summary,
+      .flow-meta-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+  <main id="playground-shell" class="playground-shell compact-mode">
+    <header class="playground-header">
+      <div class="header-left">
+        <div class="brand-mark" aria-hidden="true">
+          <span></span>
+          <span></span>
+          <span></span>
+          <span style="background:white;"></span>
+        </div>
+        <div class="header-title">
+          <strong>ctx-cache-compressor</strong>
+          <span id="header-subtitle" data-i18n="header.subtitle">Demo Console</span>
+        </div>
+      </div>
+      <div id="header-center-copy" class="header-center" data-i18n="header.center">
+        Create a session, send messages, and watch context compression evolve in real time.
+      </div>
+      <div class="header-right">
+        <div class="locale-toggle" aria-label="Language switch">
+          <button id="locale-en" class="mini-button locale-button active" type="button">EN</button>
+          <button id="locale-zh" class="mini-button locale-button" type="button">中文</button>
+        </div>
+        <div class="header-status"><span id="health-dot" class="status-dot"></span><span id="health-text">Service</span></div>
+        <div class="header-status"><span id="compression-dot" class="status-dot"></span><span id="compression-text">Compression</span></div>
+        <button id="refresh-context" class="icon-button" type="button" data-i18n="button.refresh">Refresh</button>
+        <button id="create-session" class="connect-button" type="button">Create Session</button>
+      </div>
+    </header>
+
+    <section class="playground-layout">
+      <aside class="left-rail">
+        <section class="tile overview-tile dark">
+          <div class="tile-title" data-i18n="section.observe">Observe</div>
+          <div class="tile-body">
+            <div class="monitor-scroll">
+              <section class="config-section">
+                <div class="section-head">
+                  <h3 data-i18n="section.currentSession">Current Session</h3>
+                  <button id="copy-session-id" class="mini-button" type="button">Copy</button>
+                </div>
+                <div class="config-rows">
+                  <div class="config-row">
+                    <span data-i18n="label.sessionId">Session ID</span>
+                    <strong id="session-flag">Not created</strong>
+                  </div>
+                  <div class="config-row">
+                    <span data-i18n="label.turnsTokens">Turns / Tokens</span>
+                    <strong id="metric-overview">0 / 0</strong>
+                  </div>
+                </div>
+                <div class="pill-row">
+                  <div id="mode-chip" class="chip">Idle</div>
+                  <div id="summary-chip" class="chip">No Summary</div>
+                </div>
+              </section>
+
+              <section class="config-section">
+                <h3 data-i18n="section.compressionPolicy">Compression Policy</h3>
+                <div class="config-rows">
+                  <div class="config-row">
+                    <span data-i18n="label.model">Model</span>
+                    <strong id="cfg-model">Loading...</strong>
+                  </div>
+                  <div class="config-row">
+                    <span data-i18n="label.baseUrl">Base URL</span>
+                    <strong id="cfg-base">-</strong>
+                  </div>
+                  <div class="config-row">
+                    <span data-i18n="label.compressionFrequency">Compression Frequency</span>
+                    <strong id="cfg-every-turns">-</strong>
+                  </div>
+                  <div class="config-row">
+                    <span data-i18n="label.keepRecentTurns">Keep Recent Turns</span>
+                    <strong id="cfg-keep-recent">-</strong>
+                  </div>
+                  <div class="config-row">
+                    <span data-i18n="label.timeoutRetries">Timeout / Retries</span>
+                    <strong id="cfg-timeout-retries">-</strong>
+                  </div>
+                </div>
+              </section>
+
+              <section class="config-section">
+                <h3 data-i18n="section.runtimeMetrics">Runtime Metrics</h3>
+                <div class="config-rows">
+                  <div class="config-row">
+                    <span data-i18n="label.apiRoundtrip">API Roundtrip</span>
+                    <strong id="metric-roundtrip">-</strong>
+                  </div>
+                  <div class="config-row">
+                    <span data-i18n="label.modelLatency">Model Latency</span>
+                    <strong id="metric-latency">-</strong>
+                  </div>
+                  <div class="config-row">
+                    <span data-i18n="label.messageCount">Message Count</span>
+                    <strong id="metric-messages">0</strong>
+                  </div>
+                  <div class="config-row">
+                    <span data-i18n="label.compressedTurns">Compressed Turns</span>
+                    <strong id="metric-compressed">0</strong>
+                  </div>
+                  <div class="config-row">
+                    <span data-i18n="label.summaryCount">Summary Count</span>
+                    <strong id="metric-summaries">0</strong>
+                  </div>
+                  <div class="config-row">
+                    <span data-i18n="label.stablePending">Stable / Pending</span>
+                    <strong id="metric-buffers">0 / 0</strong>
+                  </div>
+                </div>
+              </section>
+
+              <section class="config-section">
+                <div class="section-head">
+                  <h3 data-i18n="section.compressionCurve">Compression Curve</h3>
+                </div>
+                <div class="timeline-toolbar">
+                  <button class="metric-switch active" type="button" data-metric="tokens" data-i18n="chart.metric.tokens">Tokens</button>
+                  <button class="metric-switch" type="button" data-metric="latency" data-i18n="chart.metric.latency">Latency</button>
+                  <button class="metric-switch" type="button" data-metric="turns" data-i18n="chart.metric.turns">Turns</button>
+                  <button class="metric-switch" type="button" data-metric="compressed" data-i18n="chart.metric.compressed">Compressed</button>
+                </div>
+                <div class="chart-frame">
+                  <div class="chart-grid"></div>
+                  <svg id="metric-chart" class="chart-svg" viewBox="0 0 640 220" preserveAspectRatio="none" data-i18n-aria-label="chart.aria" aria-label="Metric timeline chart">
+                    <defs>
+                      <linearGradient id="chart-area-gradient" x1="0" x2="0" y1="0" y2="1">
+                        <stop offset="0%" stop-color="rgba(34, 211, 238, 0.28)"></stop>
+                        <stop offset="100%" stop-color="rgba(34, 211, 238, 0.02)"></stop>
+                      </linearGradient>
+                    </defs>
+                    <path id="chart-area" class="chart-area" d=""></path>
+                    <path id="chart-path" class="chart-path" d=""></path>
+                    <g id="chart-dots" class="chart-dots"></g>
+                  </svg>
+                </div>
+                <div class="chart-summary">
+                  <div class="summary-stat">
+                    <span data-i18n="label.metric">Metric</span>
+                    <strong id="chart-metric-label">Tokens</strong>
+                  </div>
+                  <div class="summary-stat">
+                    <span data-i18n="label.latestValue">Latest Value</span>
+                    <strong id="chart-latest">0</strong>
+                  </div>
+                  <div class="summary-stat">
+                    <span data-i18n="label.range">Range</span>
+                    <strong id="chart-range">0 - 0</strong>
+                  </div>
+                  <div class="summary-stat">
+                    <span data-i18n="label.samples">Samples</span>
+                    <strong id="chart-samples">0</strong>
+                  </div>
+                </div>
+              </section>
+
+            </div>
+          </div>
+        </section>
+      </aside>
+
+      <section class="tile chat-tile">
+        <div class="tile-title" data-i18n="section.conversation">Conversation</div>
+        <div class="tile-body chat-stage">
+          <div class="chat-banner">
+            <div class="chat-banner-copy">
+              <strong id="chat-banner-title" data-i18n="chat.bannerTitle">Context Compression Demo</strong>
+              <span id="preview-caption">Stay in one session and watch turn growth, summary injection, and context shrinkage over time.</span>
+            </div>
+            <div id="live-pill" class="live-pill">Idle</div>
+          </div>
+
+          <div id="chat-log" class="chat-log">
+            <div class="empty-state">No session yet. Create one, then send your first message.</div>
+          </div>
+
+          <form id="composer-form" class="composer">
+            <textarea id="composer-input" data-i18n-placeholder="composer.placeholder" placeholder="Type a message..."></textarea>
+            <div class="composer-footer">
+              <div id="composer-note" class="composer-note">Ctrl+Enter to send, Enter for a new line.</div>
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button id="jump-latest" class="header-button" type="button" data-i18n="button.jumpLatest">Jump To Latest</button>
+                <button id="send-button" class="send-button" type="submit" data-i18n="button.send">Send</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <aside class="right-rail">
+        <section class="tile runtime-tile settings">
+          <div class="tile-title" data-i18n="section.settings">Settings</div>
+          <div class="tile-body">
+            <div class="settings-scroll">
+              <section class="config-section">
+                <h3 data-i18n="section.session">Session</h3>
+                <div class="field">
+                  <label for="session-id" data-i18n="label.sessionId">Session ID</label>
+                  <input id="session-id" data-i18n-placeholder="placeholder.currentSession" placeholder="Leave blank to use the current session">
+                </div>
+                <div class="settings-actions">
+                  <button id="reset-local" class="header-button" type="button" data-i18n="button.resetLocal">Reset Local View</button>
+                </div>
+              </section>
+
+              <section class="config-section">
+                <h3 data-i18n="section.compressionPolicy">Compression Policy</h3>
+                <div class="field">
+                  <label for="runtime-llm-base" data-i18n="label.baseUrl">Base URL</label>
+                  <input id="runtime-llm-base" placeholder="https://api.deepseek.com">
+                </div>
+                <div class="field">
+                  <label for="runtime-llm-api-key" data-i18n="label.apiKey">API Key</label>
+                  <input id="runtime-llm-api-key" type="password" data-i18n-placeholder="placeholder.apiKey" placeholder="Leave blank to keep the current key">
+                  <div id="runtime-config-note" class="field-hint">Loading runtime config...</div>
+                </div>
+                <div class="field">
+                  <label for="runtime-llm-model" data-i18n="label.model">Model</label>
+                  <input id="runtime-llm-model" placeholder="deepseek-chat">
+                </div>
+                <div class="field">
+                  <label for="runtime-compression-every-turns" data-i18n="label.compressionFrequency">Compression Frequency</label>
+                  <input id="runtime-compression-every-turns" type="number" min="1" step="1">
+                </div>
+                <div class="settings-actions">
+                  <button id="apply-runtime-config" class="header-button primary" type="button" data-i18n="button.applyConfig">Apply Config</button>
+                </div>
+              </section>
+
+              <section class="config-section">
+                <h3 data-i18n="section.sessionCache">Session Cache</h3>
+                <div class="field">
+                  <label for="session-list" data-i18n="label.currentSessions">Current Sessions</label>
+                  <select id="session-list" class="session-list" size="6"></select>
+                </div>
+                <div id="session-cache-hint" class="field-hint" data-i18n="hint.sessionCache">
+                  Selecting one syncs the Session ID above. Deleting it clears the in-memory session cache.
+                </div>
+                <div class="settings-actions">
+                  <button id="delete-selected-session" class="header-button danger" type="button" data-i18n="button.deleteSelected">Delete Selected</button>
+                  <button id="refresh-sessions" class="header-button" type="button" data-i18n="button.refreshList">Refresh List</button>
+                </div>
+              </section>
+
+              <p id="config-note" class="helper">Loading config...</p>
+
+              <section class="config-section advanced-section">
+                <div class="field">
+                  <label for="api-base" data-i18n="label.apiAddress">API Base</label>
+                  <input id="api-base" value="">
+                </div>
+                <div class="field">
+                  <label for="poll-interval" data-i18n="label.pollInterval">Polling Interval</label>
+                  <select id="poll-interval">
+                    <option value="800">800 ms</option>
+                    <option value="1200" selected>1200 ms</option>
+                    <option value="2000">2000 ms</option>
+                    <option value="3500">3500 ms</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="auto-refresh" data-i18n="label.autoRefresh">Auto Refresh</label>
+                  <select id="auto-refresh">
+                    <option value="on" selected data-i18n="option.on">On</option>
+                    <option value="off" data-i18n="option.off">Off</option>
+                  </select>
+                </div>
+              </section>
+            </div>
+          </div>
+        </section>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    const state = {
+      apiBase: window.location.origin,
+      locale: resolveInitialLocale(),
+      sessionId: "",
+      runtimeLlmBaseUrl: "",
+      runtimeLlmApiKey: "",
+      runtimeLlmModel: "",
+      runtimeCompressionEveryTurns: "",
+      context: null,
+      lastLatencyMs: null,
+      lastRoundtripMs: null,
+      lastRequestPath: "",
+      lastRequestMethod: "",
+      lastRequestAt: null,
+      requestCount: 0,
+      lastError: "",
+      lastDemo: null,
+      autoRefresh: true,
+      pollIntervalMs: 1200,
+      pollTimer: null,
+      isSending: false,
+      health: null,
+      config: null,
+      availableSessions: [],
+      selectedSessionId: "",
+      copySessionStatus: "idle",
+      metricHistory: [],
+      metricSignature: "",
+      activeMetric: "tokens",
+      chatSignature: "",
+      pendingScrollToLatest: false,
+      chatScrollFrame: 0
+    };
+
+    const localeCopy = {
+      en: {
+        "meta.title": "ctx-cache-compressor Demo Console",
+        "header.subtitle": "Demo Console",
+        "header.center": "Create a session, send messages, and watch context compression evolve in real time.",
+        "section.observe": "Observe",
+        "section.currentSession": "Current Session",
+        "section.compressionPolicy": "Compression Policy",
+        "section.runtimeMetrics": "Runtime Metrics",
+        "section.compressionCurve": "Compression Curve",
+        "section.conversation": "Conversation",
+        "section.settings": "Settings",
+        "section.session": "Session",
+        "section.sessionCache": "Session Cache",
+        "chat.bannerTitle": "Context Compression Demo",
+        "chart.aria": "Metric timeline chart",
+        "label.sessionId": "Session ID",
+        "label.turnsTokens": "Turns / Tokens",
+        "label.model": "Model",
+        "label.baseUrl": "Base URL",
+        "label.compressionFrequency": "Compression Frequency",
+        "label.keepRecentTurns": "Keep Recent Turns",
+        "label.timeoutRetries": "Timeout / Retries",
+        "label.apiRoundtrip": "API Roundtrip",
+        "label.modelLatency": "Model Latency",
+        "label.messageCount": "Message Count",
+        "label.compressedTurns": "Compressed Turns",
+        "label.summaryCount": "Summary Count",
+        "label.stablePending": "Stable / Pending",
+        "label.metric": "Metric",
+        "label.latestValue": "Latest Value",
+        "label.range": "Range",
+        "label.samples": "Samples",
+        "label.apiKey": "API Key",
+        "label.currentSessions": "Current Sessions",
+        "label.apiAddress": "API Base",
+        "label.pollInterval": "Polling Interval",
+        "label.autoRefresh": "Auto Refresh",
+        "button.refresh": "Refresh",
+        "button.createSession": "Create Session",
+        "button.newSession": "New Session",
+        "button.copy": "Copy",
+        "button.copied": "Copied",
+        "button.jumpLatest": "Jump To Latest",
+        "button.send": "Send",
+        "button.resetLocal": "Reset Local View",
+        "button.applyConfig": "Apply Config",
+        "button.deleteSelected": "Delete Selected",
+        "button.refreshList": "Refresh List",
+        "placeholder.composer": "Type a message...",
+        "placeholder.currentSession": "Leave blank to use the current session",
+        "placeholder.apiKey": "Leave blank to keep the current key",
+        "status.service": "Service",
+        "status.compression": "Compression",
+        "status.serviceHealthy": "Service healthy · {sessions} sessions",
+        "status.serviceUnavailable": "Service unavailable",
+        "status.compressing": "Compressing",
+        "status.busy": "Request In Flight",
+        "status.live": "Live",
+        "status.idle": "Idle",
+        "status.running": "Running",
+        "status.noSummary": "No Summary",
+        "status.hasSummary": "Summary Present",
+        "status.notCreated": "Not created",
+        "note.composer.default": "Ctrl+Enter to send, Enter for a new line.",
+        "note.composer.busy": "Calling the upstream model...",
+        "note.creatingSession": "Creating session...",
+        "note.deletingSession": "Deleting selected session...",
+        "note.refreshingSessions": "Refreshing session list...",
+        "note.refreshingContext": "Refreshing context...",
+        "note.updatingConfig": "Updating runtime config...",
+        "hint.loadingRuntimeConfig": "Loading runtime config...",
+        "hint.noApiKeyConfigured": "No upstream key configured",
+        "hint.loadingConfig": "Loading config...",
+        "hint.sessionCache": "Selecting one syncs the Session ID above. Deleting it clears the in-memory session cache.",
+        "hint.configLoaded": "{poll} ms polling · TTL {ttl} s · max {max} sessions",
+        "caption.compressing": "Background compression is running, but you can keep chatting and the active context remains readable.",
+        "caption.busy": "The demo is calling /demo/chat and the upstream model, then refreshing this session's messages and metrics.",
+        "caption.hasSummary": "This session already contains a summary message. Keep going to watch the next compression cycle accumulate.",
+        "caption.sessionReady": "The session is ready. Send the first message to start tracking turns, tokens, and compression signals.",
+        "caption.noSession": "Create a session first, then start chatting to observe turn growth and summary injection.",
+        "empty.noSession": "No session yet. Create one, then send your first message.",
+        "empty.sessionReady": "The session is ready. Send your first message to start visualizing compression metrics.",
+        "empty.noVisibleMessages": "There are no displayable chat messages yet.",
+        "role.summary": "Context Summary",
+        "role.user": "User",
+        "role.assistant": "Assistant",
+        "config.loading": "Loading...",
+        "config.turns": "{value} turns",
+        "config.timeoutRetries": "{seconds} s / {retries} retries",
+        "chart.metric.tokens": "Tokens",
+        "chart.metric.latency": "Latency",
+        "chart.metric.turns": "Turns",
+        "chart.metric.compressed": "Compressed",
+        "session.list.empty": "No sessions yet",
+        "session.list.item": "{id} · {turns} turns · {messages} messages",
+        "option.on": "On",
+        "option.off": "Off",
+        "alert.copyFailed": "Copy failed",
+        "alert.bootFailed": "Demo console initialization failed: {message}"
+      },
+      "zh-CN": {
+        "meta.title": "ctx-cache-compressor 演示台",
+        "header.subtitle": "演示台",
+        "header.center": "先创建会话，再发送消息，观察上下文压缩如何随对话实时变化。",
+        "section.observe": "监测",
+        "section.currentSession": "当前会话",
+        "section.compressionPolicy": "压缩策略",
+        "section.runtimeMetrics": "运行指标",
+        "section.compressionCurve": "压缩曲线",
+        "section.conversation": "对话",
+        "section.settings": "配置",
+        "section.session": "会话",
+        "section.sessionCache": "会话缓存",
+        "chat.bannerTitle": "上下文压缩演示",
+        "chart.aria": "指标时间线图表",
+        "label.sessionId": "会话 ID",
+        "label.turnsTokens": "轮次 / Token",
+        "label.model": "模型",
+        "label.baseUrl": "Base URL",
+        "label.compressionFrequency": "压缩频率",
+        "label.keepRecentTurns": "保留轮次",
+        "label.timeoutRetries": "超时 / 重试",
+        "label.apiRoundtrip": "接口耗时",
+        "label.modelLatency": "模型耗时",
+        "label.messageCount": "消息数",
+        "label.compressedTurns": "已压缩轮次",
+        "label.summaryCount": "摘要数",
+        "label.stablePending": "Stable / Pending",
+        "label.metric": "指标",
+        "label.latestValue": "最新值",
+        "label.range": "范围",
+        "label.samples": "采样",
+        "label.apiKey": "API Key",
+        "label.currentSessions": "当前会话列表",
+        "label.apiAddress": "API 地址",
+        "label.pollInterval": "轮询间隔",
+        "label.autoRefresh": "自动刷新",
+        "button.refresh": "刷新",
+        "button.createSession": "创建会话",
+        "button.newSession": "新建会话",
+        "button.copy": "复制",
+        "button.copied": "已复制",
+        "button.jumpLatest": "到底部",
+        "button.send": "发送",
+        "button.resetLocal": "重置本地",
+        "button.applyConfig": "应用配置",
+        "button.deleteSelected": "删除选中会话",
+        "button.refreshList": "刷新列表",
+        "placeholder.composer": "输入消息…",
+        "placeholder.currentSession": "留空则使用当前会话",
+        "placeholder.apiKey": "留空则保持当前密钥",
+        "status.service": "服务",
+        "status.compression": "压缩",
+        "status.serviceHealthy": "服务正常 · {sessions} 个会话",
+        "status.serviceUnavailable": "服务不可用",
+        "status.compressing": "压缩进行中",
+        "status.busy": "请求处理中",
+        "status.live": "在线",
+        "status.idle": "空闲",
+        "status.running": "运行中",
+        "status.noSummary": "无摘要",
+        "status.hasSummary": "已有摘要",
+        "status.notCreated": "未创建",
+        "note.composer.default": "Ctrl+Enter 发送，Enter 换行。",
+        "note.composer.busy": "正在请求上游模型…",
+        "note.creatingSession": "正在创建会话…",
+        "note.deletingSession": "正在删除选中会话…",
+        "note.refreshingSessions": "正在刷新会话列表…",
+        "note.refreshingContext": "正在刷新上下文…",
+        "note.updatingConfig": "正在更新运行配置…",
+        "hint.loadingRuntimeConfig": "正在加载运行配置…",
+        "hint.noApiKeyConfigured": "未配置上游密钥",
+        "hint.loadingConfig": "正在加载配置…",
+        "hint.sessionCache": "选择后会同步到上方会话 ID；删除会清掉该 session 对应的内存缓存。",
+        "hint.configLoaded": "{poll} ms 轮询 · TTL {ttl} 秒 · 最多 {max} 个会话",
+        "caption.compressing": "后台正在压缩历史消息，但你仍然可以继续对话，当前上下文会保持可读。",
+        "caption.busy": "正在调用 /demo/chat 和上游模型，返回后会刷新同一个会话里的消息与指标。",
+        "caption.hasSummary": "当前会话里已经出现摘要消息，继续对话就能看到后续压缩周期如何累积。",
+        "caption.sessionReady": "会话已创建。发送第一条消息后，页面会开始记录轮次、Token 和压缩信号。",
+        "caption.noSession": "先创建会话，再开始对话。这样你可以持续观察轮次增长和摘要注入。",
+        "empty.noSession": "还没有会话。先创建会话，再发送第一条消息。",
+        "empty.sessionReady": "会话已就绪。发送第一条消息后，页面会开始展示上下文压缩相关指标。",
+        "empty.noVisibleMessages": "当前还没有可展示的对话内容。",
+        "role.summary": "上下文摘要",
+        "role.user": "用户",
+        "role.assistant": "助手",
+        "config.loading": "加载中",
+        "config.turns": "{value} 轮",
+        "config.timeoutRetries": "{seconds} 秒 / {retries} 次",
+        "chart.metric.tokens": "Token",
+        "chart.metric.latency": "延迟",
+        "chart.metric.turns": "轮次",
+        "chart.metric.compressed": "压缩",
+        "session.list.empty": "暂无会话",
+        "session.list.item": "{id} · {turns} 轮 · {messages} 条",
+        "option.on": "开启",
+        "option.off": "关闭",
+        "alert.copyFailed": "复制失败",
+        "alert.bootFailed": "演示台初始化失败：{message}"
+      }
+    };
+
+    const metricDefs = {
+      tokens: {
+        labelKey: "chart.metric.tokens",
+        formatter: (value) => String(Math.round(value || 0)),
+        getter: (sample) => sample.tokenEstimate
+      },
+      latency: {
+        labelKey: "chart.metric.latency",
+        formatter: (value) => value == null ? "-" : `${Math.round(value)} ms`,
+        getter: (sample) => sample.latencyMs
+      },
+      turns: {
+        labelKey: "chart.metric.turns",
+        formatter: (value) => String(Math.round(value || 0)),
+        getter: (sample) => sample.turns
+      },
+      compressed: {
+        labelKey: "chart.metric.compressed",
+        formatter: (value) => String(Math.round(value || 0)),
+        getter: (sample) => sample.compressedTurns
+      }
+    };
+
+    const els = {
+      playgroundShell: document.getElementById("playground-shell"),
+      apiBase: document.getElementById("api-base"),
+      sessionId: document.getElementById("session-id"),
+      localeEn: document.getElementById("locale-en"),
+      localeZh: document.getElementById("locale-zh"),
+      runtimeLlmBase: document.getElementById("runtime-llm-base"),
+      runtimeLlmApiKey: document.getElementById("runtime-llm-api-key"),
+      runtimeLlmModel: document.getElementById("runtime-llm-model"),
+      runtimeCompressionEveryTurns: document.getElementById("runtime-compression-every-turns"),
+      applyRuntimeConfig: document.getElementById("apply-runtime-config"),
+      runtimeConfigNote: document.getElementById("runtime-config-note"),
+      pollInterval: document.getElementById("poll-interval"),
+      autoRefresh: document.getElementById("auto-refresh"),
+      createSession: document.getElementById("create-session"),
+      refreshContext: document.getElementById("refresh-context"),
+      resetLocal: document.getElementById("reset-local"),
+      copySessionId: document.getElementById("copy-session-id"),
+      sessionList: document.getElementById("session-list"),
+      deleteSelectedSession: document.getElementById("delete-selected-session"),
+      refreshSessions: document.getElementById("refresh-sessions"),
+      jumpLatest: document.getElementById("jump-latest"),
+      healthDot: document.getElementById("health-dot"),
+      healthText: document.getElementById("health-text"),
+      compressionDot: document.getElementById("compression-dot"),
+      compressionText: document.getElementById("compression-text"),
+      livePill: document.getElementById("live-pill"),
+      previewCaption: document.getElementById("preview-caption"),
+      sessionFlag: document.getElementById("session-flag"),
+      modeChip: document.getElementById("mode-chip"),
+      summaryChip: document.getElementById("summary-chip"),
+      chatLog: document.getElementById("chat-log"),
+      composerForm: document.getElementById("composer-form"),
+      composerInput: document.getElementById("composer-input"),
+      composerNote: document.getElementById("composer-note"),
+      sendButton: document.getElementById("send-button"),
+      metricRoundtrip: document.getElementById("metric-roundtrip"),
+      metricLatency: document.getElementById("metric-latency"),
+      metricOverview: document.getElementById("metric-overview"),
+      metricMessages: document.getElementById("metric-messages"),
+      metricCompressed: document.getElementById("metric-compressed"),
+      metricBuffers: document.getElementById("metric-buffers"),
+      metricSummaries: document.getElementById("metric-summaries"),
+      cfgModel: document.getElementById("cfg-model"),
+      cfgBase: document.getElementById("cfg-base"),
+      cfgEveryTurns: document.getElementById("cfg-every-turns"),
+      cfgKeepRecent: document.getElementById("cfg-keep-recent"),
+      cfgTimeoutRetries: document.getElementById("cfg-timeout-retries"),
+      configNote: document.getElementById("config-note"),
+      chartPath: document.getElementById("chart-path"),
+      chartArea: document.getElementById("chart-area"),
+      chartDots: document.getElementById("chart-dots"),
+      chartMetricLabel: document.getElementById("chart-metric-label"),
+      chartLatest: document.getElementById("chart-latest"),
+      chartRange: document.getElementById("chart-range"),
+      chartSamples: document.getElementById("chart-samples"),
+      metricSwitches: Array.from(document.querySelectorAll("[data-metric]"))
+    };
+
+    function normalizeLocale(value) {
+      if (!value) return "en";
+      const lower = String(value).toLowerCase();
+      if (lower === "zh" || lower === "zh-cn" || lower === "zh_hans" || lower === "zh-hans") {
+        return "zh-CN";
+      }
+      return "en";
+    }
+
+    function resolveInitialLocale() {
+      const search = new URLSearchParams(window.location.search);
+      const urlLocale = normalizeLocale(search.get("lang"));
+      if (search.has("lang")) {
+        return urlLocale;
+      }
+
+      try {
+        const storedLocale = window.localStorage.getItem("ctx-cache-compressor.locale");
+        if (storedLocale) {
+          return normalizeLocale(storedLocale);
+        }
+      } catch (error) {
+        console.warn(error);
+      }
+
+      return "en";
+    }
+
+    function t(key, variables = {}) {
+      const copy = localeCopy[state.locale] || localeCopy.en;
+      const template = copy[key] || localeCopy.en[key] || key;
+      return template.replace(/\{(\w+)\}/g, (_, name) => String(variables[name] ?? `{${name}}`));
+    }
+
+    function applyLocaleToStaticNodes() {
+      document.documentElement.lang = state.locale;
+      document.documentElement.dir = "ltr";
+      document.title = t("meta.title");
+
+      document.querySelectorAll("[data-i18n]").forEach((node) => {
+        node.textContent = t(node.dataset.i18n);
+      });
+
+      document.querySelectorAll("[data-i18n-placeholder]").forEach((node) => {
+        node.setAttribute("placeholder", t(node.dataset.i18nPlaceholder));
+      });
+
+      document.querySelectorAll("[data-i18n-aria-label]").forEach((node) => {
+        node.setAttribute("aria-label", t(node.dataset.i18nAriaLabel));
+      });
+
+      els.localeEn.classList.toggle("active", state.locale === "en");
+      els.localeZh.classList.toggle("active", state.locale === "zh-CN");
+    }
+
+    function setLocale(nextLocale) {
+      state.locale = normalizeLocale(nextLocale);
+      try {
+        window.localStorage.setItem("ctx-cache-compressor.locale", state.locale);
+      } catch (error) {
+        console.warn(error);
+      }
+      renderAll();
+    }
+
+    function copyButtonText() {
+      return state.copySessionStatus === "copied" ? t("button.copied") : t("button.copy");
+    }
+
+    function endpoint(path) {
+      return `${state.apiBase.replace(/\/$/, "")}${path}`;
+    }
+
+    function deriveRequestKind(path) {
+      if (path === "/health" || path === "/demo/config") return "boot";
+      if (path === "/demo/chat") return "chat";
+      if (path.includes("/context")) return "context";
+      if (path === "/sessions" || path.startsWith("/sessions/")) return "session";
+      return "other";
+    }
+
+    function markRequest(method, path) {
+      state.lastRequestMethod = method;
+      state.lastRequestPath = path;
+      state.lastRequestAt = new Date().toISOString();
+      state.requestCount += 1;
+      renderAll();
+    }
+
+    async function apiFetch(path, options = {}) {
+      const method = String(options.method || "GET").toUpperCase();
+      markRequest(method, path);
+      const startedAt = performance.now();
+
+      try {
+        const response = await fetch(endpoint(path), {
+          headers: {
+            "Content-Type": "application/json",
+            ...(options.headers || {})
+          },
+          ...options
+        });
+
+        const contentType = response.headers.get("content-type") || "";
+        const isJson = contentType.includes("application/json");
+        const body = isJson ? await response.json() : await response.text();
+        state.lastRoundtripMs = performance.now() - startedAt;
+
+        if (!response.ok) {
+          const message = isJson && body && body.error ? body.error : String(body || response.statusText);
+          state.lastError = message;
+          throw new Error(message);
+        }
+
+        state.lastError = "";
+        return body;
+      } catch (error) {
+        state.lastRoundtripMs = performance.now() - startedAt;
+        if (!state.lastError) {
+          state.lastError = error instanceof Error ? error.message : String(error);
+        }
+        throw error;
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+    }
+
+    function formatTime(value) {
+      if (!value) return "无";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return value;
+      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    }
+
+    function shortValue(value, fallback = "-") {
+      if (value == null || value === "") return fallback;
+      const text = String(value);
+      return text.length > 28 ? `${text.slice(0, 28)}…` : text;
+    }
+
+    function setNodeValue(node, value) {
+      if (!node) return;
+      if ("value" in node) {
+        node.value = value;
+        return;
+      }
+      node.textContent = value;
+    }
+
+    function messageText(message) {
+      if (!message || message.content == null) return "";
+      if (typeof message.content === "string") return message.content;
+      if (Array.isArray(message.content)) {
+        return message.content
+          .map((part) => part && part.text ? part.text : "")
+          .filter(Boolean)
+          .join("\n");
+      }
+      return "";
+    }
+
+    function isChatNearBottom() {
+      const node = els.chatLog;
+      if (!node) return true;
+      const distance = node.scrollHeight - node.clientHeight - node.scrollTop;
+      return distance <= 56;
+    }
+
+    function scheduleChatScroll(force = false) {
+      if (!els.chatLog) return;
+      if (force) {
+        state.pendingScrollToLatest = true;
+      }
+
+      if (state.chatScrollFrame) {
+        window.cancelAnimationFrame(state.chatScrollFrame);
+      }
+
+      state.chatScrollFrame = window.requestAnimationFrame(() => {
+        els.chatLog.scrollTop = els.chatLog.scrollHeight;
+        state.pendingScrollToLatest = false;
+        state.chatScrollFrame = 0;
+      });
+    }
+
+    function currentMode() {
+      if (state.isSending) return "busy";
+      if (state.context && state.context.is_compressing) return "compressing";
+      return state.sessionId ? "live" : "idle";
+    }
+
+    function syncInputsFromState() {
+      els.apiBase.value = state.apiBase;
+      els.sessionId.value = state.sessionId;
+      els.runtimeLlmBase.value = state.runtimeLlmBaseUrl;
+      els.runtimeLlmApiKey.value = state.runtimeLlmApiKey;
+      els.runtimeLlmModel.value = state.runtimeLlmModel;
+      els.runtimeCompressionEveryTurns.value = state.runtimeCompressionEveryTurns;
+      els.pollInterval.value = String(state.pollIntervalMs);
+      els.autoRefresh.value = state.autoRefresh ? "on" : "off";
+    }
+
+    function setBusy(isBusy, note = "") {
+      state.isSending = isBusy;
+      els.sendButton.disabled = isBusy;
+      els.createSession.disabled = isBusy;
+      els.refreshContext.disabled = isBusy;
+      els.resetLocal.disabled = isBusy;
+      els.copySessionId.disabled = isBusy || !state.sessionId;
+      els.deleteSelectedSession.disabled = isBusy;
+      els.refreshSessions.disabled = isBusy;
+      els.applyRuntimeConfig.disabled = isBusy;
+      els.composerInput.disabled = isBusy;
+      els.composerNote.textContent = note || (isBusy ? t("note.composer.busy") : t("note.composer.default"));
+      renderAll();
+    }
+
+    function renderHealth() {
+      const ok = state.health && state.health.status === "ok";
+      els.healthDot.className = `status-dot ${ok ? "ok" : ""}`;
+      els.healthText.textContent = ok
+        ? t("status.serviceHealthy", { sessions: state.health.sessions })
+        : t("status.serviceUnavailable");
+    }
+
+    function renderHeaderState() {
+      const mode = currentMode();
+      els.compressionDot.className = `status-dot ${mode === "compressing" || mode === "busy" ? "busy" : state.context ? "ok" : ""}`;
+      const modeLabels = {
+        compressing: t("status.compressing"),
+        busy: t("status.busy"),
+        live: t("status.live"),
+        idle: t("status.idle")
+      };
+
+      els.compressionText.textContent = modeLabels[mode] || t("status.idle");
+      els.createSession.textContent = state.sessionId ? t("button.newSession") : t("button.createSession");
+      els.sessionFlag.textContent = state.sessionId ? shortValue(state.sessionId, t("status.notCreated")) : t("status.notCreated");
+      els.copySessionId.disabled = !state.sessionId;
+      els.copySessionId.textContent = copyButtonText();
+      els.modeChip.textContent = mode === "compressing" ? t("status.compressing") : mode === "busy" ? t("status.busy") : state.sessionId ? t("status.running") : t("status.idle");
+      els.modeChip.className = `chip ${mode === "compressing" || mode === "busy" ? "active" : ""}`;
+      const hasSummary = !!(state.context && state.context.summary_message_count > 0);
+      els.summaryChip.textContent = hasSummary ? t("status.hasSummary") : t("status.noSummary");
+      els.summaryChip.className = `chip ${hasSummary ? "active" : ""}`;
+      els.livePill.textContent =
+        mode === "compressing"
+          ? t("status.compressing")
+          : mode === "busy"
+            ? t("status.busy")
+            : state.sessionId
+              ? t("status.live")
+              : t("status.idle");
+    }
+
+    function renderNarrativeState() {
+      const mode = currentMode();
+      if (mode === "compressing") {
+        els.previewCaption.textContent = t("caption.compressing");
+        return;
+      }
+
+      if (mode === "busy") {
+        els.previewCaption.textContent = t("caption.busy");
+        return;
+      }
+
+      if (state.context && state.context.summary_message_count > 0) {
+        els.previewCaption.textContent = t("caption.hasSummary");
+        return;
+      }
+
+      if (state.sessionId) {
+        els.previewCaption.textContent = t("caption.sessionReady");
+        return;
+      }
+
+      els.previewCaption.textContent = t("caption.noSession");
+    }
+
+    function renderLayoutMode() {
+      const expanded = !!state.sessionId;
+      els.playgroundShell.classList.toggle("compact-mode", !expanded);
+    }
+
+    function renderConfig() {
+      if (!state.config) {
+        setNodeValue(els.cfgModel, t("config.loading"));
+        setNodeValue(els.cfgBase, "-");
+        setNodeValue(els.cfgEveryTurns, "-");
+        setNodeValue(els.cfgKeepRecent, "-");
+        setNodeValue(els.cfgTimeoutRetries, "-");
+        els.runtimeConfigNote.textContent = t("hint.loadingRuntimeConfig");
+        els.configNote.textContent = t("hint.loadingConfig");
+        return;
+      }
+
+      setNodeValue(els.cfgModel, shortValue(state.config.llm_model, "-"));
+      setNodeValue(els.cfgBase, shortValue(state.config.llm_base_url, "-"));
+      setNodeValue(els.cfgEveryTurns, t("config.turns", { value: state.config.compression_every_n_turns }));
+      setNodeValue(els.cfgKeepRecent, t("config.turns", { value: state.config.keep_recent_turns }));
+      setNodeValue(els.cfgTimeoutRetries, t("config.timeoutRetries", {
+        seconds: state.config.llm_timeout_seconds,
+        retries: state.config.max_retries
+      }));
+      els.runtimeConfigNote.textContent = state.config.llm_api_key_preview || t("hint.noApiKeyConfigured");
+      els.configNote.textContent = t("hint.configLoaded", {
+        poll: state.pollIntervalMs,
+        ttl: state.config.session_ttl_seconds,
+        max: state.config.max_sessions
+      });
+    }
+
+    function renderMessages() {
+      const context = state.context;
+      if (!context || !Array.isArray(context.messages) || context.messages.length === 0) {
+        const message = state.sessionId ? t("empty.sessionReady") : t("empty.noSession");
+        els.chatLog.innerHTML = `<div class="empty-state">${message}</div>`;
+        state.chatSignature = "";
+        state.pendingScrollToLatest = false;
+        return;
+      }
+
+      const shouldStickToBottom = state.pendingScrollToLatest || isChatNearBottom();
+      const visibleMessages = context.messages.filter((message) => {
+        const text = messageText(message);
+        const isSummary = message.role === "system" && text.startsWith("[CONTEXT SUMMARY]");
+        const isChatMessage = (message.role === "user" || message.role === "assistant") && text.trim();
+        return isSummary || isChatMessage;
+      });
+
+      if (visibleMessages.length === 0) {
+        els.chatLog.innerHTML = `<div class="empty-state">${t("empty.noVisibleMessages")}</div>`;
+        state.chatSignature = "";
+        state.pendingScrollToLatest = false;
+        return;
+      }
+
+      const nextSignature = visibleMessages
+        .map((message) => {
+          const text = messageText(message);
+          const isSummary = message.role === "system" && text.startsWith("[CONTEXT SUMMARY]");
+          return `${isSummary ? "summary" : message.role}:${text}`;
+        })
+        .join("\u241f");
+
+      els.chatLog.innerHTML = visibleMessages.map((message) => {
+        const text = messageText(message);
+        const isSummary = message.role === "system" && text.startsWith("[CONTEXT SUMMARY]");
+        const role = isSummary ? "summary" : message.role;
+        const label = isSummary ? t("role.summary") : role === "user" ? t("role.user") : t("role.assistant");
+
+        return `
+          <article class="message ${role}">
+            <div class="message-meta">${escapeHtml(label)}</div>
+            <div class="message-body">${escapeHtml(text || "(空内容)")}</div>
+          </article>
+        `;
+      }).join("");
+
+      const messagesChanged = nextSignature !== state.chatSignature;
+      state.chatSignature = nextSignature;
+      if ((messagesChanged && shouldStickToBottom) || state.pendingScrollToLatest) {
+        scheduleChatScroll(true);
+      }
+    }
+
+    function renderMetrics() {
+      const context = state.context;
+      els.metricRoundtrip.textContent = state.lastRoundtripMs == null ? "-" : `${Math.round(state.lastRoundtripMs)} ms`;
+      els.metricLatency.textContent = state.lastLatencyMs == null ? "-" : `${Math.round(state.lastLatencyMs)} ms`;
+      els.metricOverview.textContent = context ? `${context.turn_count} / ${context.token_estimate}` : "0 / 0";
+      els.metricMessages.textContent = context ? String(context.messages.length) : "0";
+      els.metricCompressed.textContent = context ? String(context.compressed_turns) : "0";
+      els.metricBuffers.textContent = context ? `${context.stable_message_count} / ${context.pending_message_count}` : "0 / 0";
+      els.metricSummaries.textContent = context ? String(context.summary_message_count) : "0";
+    }
+
+    function renderSessionList() {
+      const sessions = Array.isArray(state.availableSessions) ? state.availableSessions : [];
+      if (sessions.length === 0) {
+        els.sessionList.innerHTML = `<option value="">${t("session.list.empty")}</option>`;
+        els.sessionList.value = "";
+        return;
+      }
+
+      const preferredId = state.selectedSessionId || state.sessionId;
+      const selectedId = sessions.some((session) => session.session_id === preferredId)
+        ? preferredId
+        : sessions[0].session_id;
+      state.selectedSessionId = selectedId;
+
+      els.sessionList.innerHTML = sessions.map((session) => {
+        const label = t("session.list.item", {
+          id: shortValue(session.session_id, "-"),
+          turns: session.turn_count,
+          messages: session.message_count
+        });
+        return `<option value="${escapeHtml(session.session_id)}">${escapeHtml(label)}</option>`;
+      }).join("");
+      els.sessionList.value = selectedId;
+    }
+
+    function recordMetricSample() {
+      if (!state.context) return;
+      const context = state.context;
+      const signature = [
+        context.turn_count,
+        context.messages.length,
+        context.token_estimate,
+        context.compressed_turns,
+        context.stable_message_count,
+        context.pending_message_count,
+        context.summary_message_count,
+        context.is_compressing,
+        state.lastLatencyMs
+      ].join("|");
+
+      if (signature === state.metricSignature) return;
+      state.metricSignature = signature;
+
+      state.metricHistory.push({
+        at: new Date().toISOString(),
+        tokenEstimate: context.token_estimate || 0,
+        latencyMs: state.lastLatencyMs,
+        turns: context.turn_count || 0,
+        messages: Array.isArray(context.messages) ? context.messages.length : 0,
+        compressedTurns: context.compressed_turns || 0,
+        stableCount: context.stable_message_count || 0,
+        pendingCount: context.pending_message_count || 0,
+        summaryCount: context.summary_message_count || 0,
+        compressing: !!context.is_compressing
+      });
+
+      if (state.metricHistory.length > 48) {
+        state.metricHistory = state.metricHistory.slice(-48);
+      }
+    }
+
+    function buildPolyline(samples) {
+      if (samples.length === 0) {
+        return { line: "", area: "", dots: "", min: 0, max: 0, latest: 0 };
+      }
+
+      const width = 640;
+      const height = 220;
+      const paddingX = 18;
+      const paddingY = 18;
+      const values = samples.map((sample) => sample.value || 0);
+      let min = Math.min(...values);
+      let max = Math.max(...values);
+
+      if (min === max) {
+        if (max === 0) {
+          max = 1;
+        } else {
+          min = min * 0.9;
+          max = max * 1.1;
+        }
+      }
+
+      const innerWidth = width - paddingX * 2;
+      const innerHeight = height - paddingY * 2;
+      const points = samples.map((sample, index) => {
+        const x = paddingX + (samples.length === 1 ? innerWidth / 2 : (innerWidth * index) / (samples.length - 1));
+        const y = paddingY + innerHeight - ((sample.value - min) / (max - min)) * innerHeight;
+        return { x, y, value: sample.value };
+      });
+
+      const line = points.map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" ");
+      const area = [
+        `M ${points[0].x.toFixed(2)} ${height - paddingY}`,
+        ...points.map((point) => `L ${point.x.toFixed(2)} ${point.y.toFixed(2)}`),
+        `L ${points[points.length - 1].x.toFixed(2)} ${height - paddingY}`,
+        "Z"
+      ].join(" ");
+      const dots = points.slice(-6).map((point) => `<circle cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="4"></circle>`).join("");
+
+      return {
+        line: points.length > 1 ? `M ${line.replace(/ /g, " L ")}` : `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)} L ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`,
+        area,
+        dots,
+        min,
+        max,
+        latest: values[values.length - 1] || 0
+      };
+    }
+
+    function renderChart() {
+      const def = metricDefs[state.activeMetric] || metricDefs.tokens;
+      const rawSamples = state.metricHistory
+        .map((sample) => ({ at: sample.at, value: def.getter(sample) }))
+        .filter((sample) => sample.value != null);
+
+      els.metricSwitches.forEach((button) => {
+        button.classList.toggle("active", button.dataset.metric === state.activeMetric);
+      });
+
+      els.chartMetricLabel.textContent = t(def.labelKey);
+      els.chartSamples.textContent = String(rawSamples.length);
+
+      if (rawSamples.length === 0) {
+        els.chartPath.setAttribute("d", "");
+        els.chartArea.setAttribute("d", "");
+        els.chartDots.innerHTML = "";
+        els.chartLatest.textContent = "0";
+        els.chartRange.textContent = "0 - 0";
+        return;
+      }
+
+      const built = buildPolyline(rawSamples);
+      els.chartPath.setAttribute("d", built.line);
+      els.chartArea.setAttribute("d", built.area);
+      els.chartDots.innerHTML = built.dots;
+      els.chartLatest.textContent = def.formatter(built.latest);
+      els.chartRange.textContent = `${def.formatter(built.min)} - ${def.formatter(built.max)}`;
+    }
+
+    function renderAll() {
+      applyLocaleToStaticNodes();
+      syncInputsFromState();
+      renderLayoutMode();
+      renderHealth();
+      renderHeaderState();
+      renderNarrativeState();
+      renderConfig();
+      renderSessionList();
+      renderMessages();
+      renderMetrics();
+      renderChart();
+    }
+
+    async function loadHealth() {
+      try {
+        state.health = await apiFetch("/health");
+      } catch (error) {
+        state.health = null;
+        console.error(error);
+      }
+      renderAll();
+    }
+
+    async function loadDemoConfig() {
+      state.config = await apiFetch("/demo/config");
+      if (!state.runtimeLlmBaseUrl) {
+        state.runtimeLlmBaseUrl = state.config.llm_base_url || "";
+      }
+      if (!state.runtimeLlmModel) {
+        state.runtimeLlmModel = state.config.llm_model || "";
+      }
+      if (!state.runtimeCompressionEveryTurns) {
+        state.runtimeCompressionEveryTurns = String(state.config.compression_every_n_turns || 1);
+      }
+      if (!state.pollIntervalMs) {
+        state.pollIntervalMs = state.config.recommended_poll_interval_ms;
+      }
+      renderAll();
+    }
+
+    async function loadSessions() {
+      const response = await apiFetch("/sessions");
+      state.availableSessions = Array.isArray(response.sessions) ? response.sessions : [];
+
+      const preferredId = state.selectedSessionId || state.sessionId;
+      if (preferredId && state.availableSessions.some((session) => session.session_id === preferredId)) {
+        state.selectedSessionId = preferredId;
+      } else if (state.availableSessions.length > 0) {
+        state.selectedSessionId = state.availableSessions[0].session_id;
+      } else {
+        state.selectedSessionId = "";
+      }
+
+      renderAll();
+    }
+
+    async function applyRuntimeConfig() {
+      const body = {
+        llm_base_url: (state.runtimeLlmBaseUrl || "").trim(),
+        llm_model: (state.runtimeLlmModel || "").trim(),
+        compression_every_n_turns: Math.max(1, Number(state.runtimeCompressionEveryTurns) || 1)
+      };
+
+      const apiKey = (state.runtimeLlmApiKey || "").trim();
+      if (apiKey) {
+        body.llm_api_key = apiKey;
+      }
+
+      state.config = await apiFetch("/demo/config", {
+        method: "PATCH",
+        body: JSON.stringify(body)
+      });
+
+      state.runtimeLlmBaseUrl = state.config.llm_base_url || "";
+      state.runtimeLlmModel = state.config.llm_model || "";
+      state.runtimeCompressionEveryTurns = String(state.config.compression_every_n_turns || 1);
+      state.runtimeLlmApiKey = "";
+      renderAll();
+    }
+
+    async function createSession() {
+      const response = await apiFetch("/sessions", {
+        method: "POST",
+        body: JSON.stringify({})
+      });
+      state.sessionId = response.session_id;
+      state.lastDemo = null;
+      state.lastLatencyMs = null;
+      state.metricHistory = [];
+      state.metricSignature = "";
+      state.selectedSessionId = response.session_id;
+      state.copySessionStatus = "idle";
+      state.pendingScrollToLatest = true;
+      await loadSessions();
+      await refreshContext();
+    }
+
+    async function deleteSession(candidateId = "") {
+      candidateId = candidateId.trim() || els.sessionId.value.trim() || state.selectedSessionId || state.sessionId;
+      if (!candidateId) return;
+      await apiFetch(`/sessions/${encodeURIComponent(candidateId)}`, { method: "DELETE" });
+      if (state.sessionId === candidateId) {
+        state.sessionId = "";
+        state.context = null;
+        state.lastLatencyMs = null;
+        state.lastDemo = null;
+        state.metricHistory = [];
+        state.metricSignature = "";
+        state.copySessionStatus = "idle";
+        state.chatSignature = "";
+        state.pendingScrollToLatest = false;
+      }
+      if (state.selectedSessionId === candidateId) {
+        state.selectedSessionId = "";
+      }
+      await loadSessions();
+      renderAll();
+    }
+
+    async function refreshContext() {
+      const candidateId = els.sessionId.value.trim() || state.sessionId;
+      if (!candidateId) {
+        state.context = null;
+        renderAll();
+        return;
+      }
+
+      state.apiBase = els.apiBase.value.trim() || window.location.origin;
+      state.sessionId = candidateId;
+
+      try {
+        state.context = await apiFetch(`/sessions/${encodeURIComponent(candidateId)}/context`);
+        recordMetricSample();
+      } catch (error) {
+        console.error(error);
+      }
+      renderAll();
+    }
+
+    async function copyCurrentSessionId() {
+      const candidateId = (state.sessionId || "").trim();
+      if (!candidateId) return;
+
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+        await navigator.clipboard.writeText(candidateId);
+      } else {
+        const input = document.createElement("textarea");
+        input.value = candidateId;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand("copy");
+        document.body.removeChild(input);
+      }
+      state.copySessionStatus = "copied";
+      renderAll();
+      window.setTimeout(() => {
+        state.copySessionStatus = "idle";
+        renderAll();
+      }, 1200);
+    }
+
+    async function sendMessage() {
+      const userMessage = els.composerInput.value.trim();
+      if (!userMessage || state.isSending) return;
+      const originalDraft = els.composerInput.value;
+
+      state.apiBase = els.apiBase.value.trim() || window.location.origin;
+      state.pollIntervalMs = Number(els.pollInterval.value) || 1200;
+      state.autoRefresh = els.autoRefresh.value === "on";
+
+      els.composerInput.value = "";
+      setBusy(true);
+      try {
+        const response = await apiFetch("/demo/chat", {
+          method: "POST",
+          body: JSON.stringify({
+            session_id: els.sessionId.value.trim() || null,
+            user_message: userMessage
+          })
+        });
+
+        state.sessionId = response.session_id;
+        state.selectedSessionId = response.session_id;
+        state.context = response.context;
+        state.lastLatencyMs = response.completion_latency_ms;
+        state.lastDemo = response;
+        recordMetricSample();
+        await loadSessions();
+        state.pendingScrollToLatest = true;
+        renderAll();
+      } catch (error) {
+        els.composerInput.value = originalDraft;
+        console.error(error);
+        alert(error.message);
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    function resetLocalView() {
+      state.sessionId = "";
+      state.context = null;
+      state.lastLatencyMs = null;
+      state.lastDemo = null;
+      state.metricHistory = [];
+      state.metricSignature = "";
+      state.copySessionStatus = "idle";
+      state.chatSignature = "";
+      state.pendingScrollToLatest = false;
+      els.composerInput.value = "";
+      renderAll();
+    }
+
+    function jumpToLatest() {
+      scheduleChatScroll(true);
+    }
+
+    function schedulePolling() {
+      window.clearTimeout(state.pollTimer);
+      if (!state.autoRefresh || !state.sessionId) return;
+
+      state.pollTimer = window.setTimeout(async () => {
+        try {
+          await refreshContext();
+        } finally {
+          schedulePolling();
+        }
+      }, state.pollIntervalMs);
+    }
+
+    els.apiBase.addEventListener("input", () => {
+      state.apiBase = els.apiBase.value;
+    });
+
+    els.sessionId.addEventListener("input", () => {
+      state.sessionId = els.sessionId.value;
+      state.copySessionStatus = "idle";
+    });
+
+    els.runtimeLlmBase.addEventListener("input", () => {
+      state.runtimeLlmBaseUrl = els.runtimeLlmBase.value;
+    });
+
+    els.runtimeLlmApiKey.addEventListener("input", () => {
+      state.runtimeLlmApiKey = els.runtimeLlmApiKey.value;
+    });
+
+    els.runtimeLlmModel.addEventListener("input", () => {
+      state.runtimeLlmModel = els.runtimeLlmModel.value;
+    });
+
+    els.runtimeCompressionEveryTurns.addEventListener("input", () => {
+      state.runtimeCompressionEveryTurns = els.runtimeCompressionEveryTurns.value;
+    });
+
+    els.sessionList.addEventListener("change", async () => {
+      state.selectedSessionId = els.sessionList.value;
+      if (state.selectedSessionId) {
+        state.sessionId = state.selectedSessionId;
+        state.copySessionStatus = "idle";
+        state.pendingScrollToLatest = true;
+        await refreshContext();
+        schedulePolling();
+      }
+    });
+
+    els.createSession.addEventListener("click", async () => {
+      if (state.sessionId && !els.sessionId.value.trim()) {
+        resetLocalView();
+      }
+      setBusy(true, t("note.creatingSession"));
+      try {
+        state.apiBase = els.apiBase.value.trim() || window.location.origin;
+        await createSession();
+      } catch (error) {
+        console.error(error);
+        alert(error.message);
+      } finally {
+        setBusy(false);
+        schedulePolling();
+      }
+    });
+
+    els.copySessionId.addEventListener("click", async () => {
+      try {
+        await copyCurrentSessionId();
+      } catch (error) {
+        console.error(error);
+        alert(error.message || t("alert.copyFailed"));
+      }
+    });
+
+    els.deleteSelectedSession.addEventListener("click", async () => {
+      setBusy(true, t("note.deletingSession"));
+      try {
+        await deleteSession(state.selectedSessionId);
+      } catch (error) {
+        console.error(error);
+        alert(error.message);
+      } finally {
+        setBusy(false);
+        schedulePolling();
+      }
+    });
+
+    els.refreshSessions.addEventListener("click", async () => {
+      setBusy(true, t("note.refreshingSessions"));
+      try {
+        await loadSessions();
+      } catch (error) {
+        console.error(error);
+        alert(error.message);
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    els.refreshContext.addEventListener("click", async () => {
+      setBusy(true, t("note.refreshingContext"));
+      try {
+        await refreshContext();
+      } catch (error) {
+        console.error(error);
+        alert(error.message);
+      } finally {
+        setBusy(false);
+        schedulePolling();
+      }
+    });
+
+    els.resetLocal.addEventListener("click", () => {
+      resetLocalView();
+      schedulePolling();
+    });
+
+    els.jumpLatest.addEventListener("click", jumpToLatest);
+
+    els.localeEn.addEventListener("click", () => {
+      setLocale("en");
+    });
+
+    els.localeZh.addEventListener("click", () => {
+      setLocale("zh-CN");
+    });
+
+    els.applyRuntimeConfig.addEventListener("click", async () => {
+      setBusy(true, t("note.updatingConfig"));
+      try {
+        await applyRuntimeConfig();
+        await refreshContext();
+      } catch (error) {
+        console.error(error);
+        alert(error.message);
+      } finally {
+        setBusy(false);
+        schedulePolling();
+      }
+    });
+
+    els.pollInterval.addEventListener("change", () => {
+      state.pollIntervalMs = Number(els.pollInterval.value) || 1200;
+      renderConfig();
+      schedulePolling();
+    });
+
+    els.autoRefresh.addEventListener("change", () => {
+      state.autoRefresh = els.autoRefresh.value === "on";
+      schedulePolling();
+      renderAll();
+    });
+
+    els.metricSwitches.forEach((button) => {
+      button.addEventListener("click", () => {
+        state.activeMetric = button.dataset.metric;
+        renderChart();
+      });
+    });
+
+    els.composerForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      await sendMessage();
+      schedulePolling();
+    });
+
+    els.composerInput.addEventListener("keydown", async (event) => {
+      if (event.key === "Enter" && event.ctrlKey) {
+        event.preventDefault();
+        await sendMessage();
+        schedulePolling();
+      }
+    });
+
+    async function boot() {
+      state.apiBase = window.location.origin;
+      syncInputsFromState();
+      await Promise.all([loadHealth(), loadDemoConfig(), loadSessions()]);
+      schedulePolling();
+      window.setInterval(loadHealth, 5000);
+    }
+
+    boot().catch((error) => {
+      console.error(error);
+      alert(t("alert.bootFailed", { message: error.message }));
+    });
+  </script>
+</body>
+</html>

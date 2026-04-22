@@ -1,0 +1,12 @@
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+target
+dist
+raw
+data/reports
+data/csv
+data/jsonl
+config.toml

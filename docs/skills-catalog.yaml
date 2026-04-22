@@ -1,0 +1,42 @@
+schema_version: "1"
+
+layers:
+  - name: "foundation"
+    purpose: "Cross-project reusable standards and systems"
+  - name: "domain"
+    purpose: "Project- or product-specific knowledge"
+  - name: "workflow"
+    purpose: "Task-specific execution guides"
+
+skills:
+  - name: "frontend-playground-design-language"
+    layer: "foundation"
+    status: "draft"
+    owner: "ctx-cache-compressor"
+    runtime_path: "~/.codex/skills/frontend-playground-design-language"
+    source_of_truth: "~/.codex/skills/frontend-playground-design-language/SKILL.md"
+    scope: "Shared design language for dark-first playground-style dashboards and agent consoles"
+    triggers:
+      - "dark-first playground UI"
+      - "agent dashboard layout"
+      - "settings rail"
+      - "tile-based operator console"
+      - "theme tokens"
+      - "i18n-ready frontend shell"
+    validation:
+      frontmatter_status: "fixed"
+      script_validation_status: "blocked"
+      script_validation_blocker: "quick_validate.py requires PyYAML in the local Python environment"
+      forward_test_status: "not_started"
+    assets:
+      - "static/dashboard.html"
+      - "static/playground-example.html"
+    notes: "First foundation skill for frontend consistency. Keep broad enough to cover both dashboard and LiveKit-inspired variants."
+
+proposals:
+  - name: "ctx-cache-compressor-observability-ui"
+    target_layer: "domain"
+    reason: "Would capture compression-specific metrics, traces, and product semantics once the UI scope stabilizes"
+  - name: "nextjs-livekit-playground-builder"
+    target_layer: "workflow"
+    reason: "Would be justified only if repeated migrations from static pages to Next.js plus LiveKit components become common"

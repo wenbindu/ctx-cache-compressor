@@ -1,0 +1,79 @@
+[server]
+# Copy this file to config.toml for local development.
+# Keep API keys empty here and inject them with environment variables.
+
+# HTTP listen host
+host = "0.0.0.0"
+# HTTP listen port
+port = 8080
+# Maximum concurrent sessions. New session creation is rejected when exceeded.
+max_sessions = 10000
+# Session idle timeout in seconds. Expired sessions are cleaned from memory.
+session_ttl_seconds = 3600
+# How often the TTL cleanup worker scans sessions.
+session_cleanup_interval_seconds = 60
+
+[compression]
+# Trigger compression every N completed turns.
+every_n_turns = 5
+# Keep the most recent N turns uncompressed for continuity.
+keep_recent_turns = 2
+# LLM compression request timeout in seconds.
+llm_timeout_seconds = 30
+# Compression retry count. 0 means no retry.
+max_retries = 1
+# Log warn-level event on compression failure.
+warn_on_failure = true
+
+[compression.prompt]
+# Core instructions for the compression model.
+system_instructions = '''
+你是一个对话历史压缩专家。
+你的任务是将给定对话压缩成高信息密度摘要，并保留关键语义。
+要求：
+1. 保留关键决策、重要事实、用户意图和阶段性结论。
+2. 保留重要工具调用结果与关键观察。
+3. 去除寒暄、重复解释、过渡性话术。
+4. 用客观第三人称组织内容，结构为：
+   [用户目标] -> [关键过程] -> [当前结论/状态]。
+5. 摘要长度控制在原文 20%-30%。
+6. 输出语言必须与原始对话主要语言一致：主要中文则输出中文，主要英文则输出英文。
+7. 仅输出摘要正文，不要附加前缀或解释。
+'''
+# Variables: {turn_count}, {serialized_messages}
+user_prompt_template = '''
+以下是需要压缩的对话历史（共 {turn_count} 轮）：
+{serialized_messages}
+'''
+# Variable: {language_label}
+language_instruction_template = "本次对话主要语言判定为：{language_label}。请严格使用{language_label}输出。"
+chinese_label = "中文"
+english_label = "English"
+# true => append language instruction based on dominant-language detection.
+enforce_dominant_language = true
+
+[llm]
+# OpenAI-compatible API base URL.
+# Default example uses DeepSeek.
+base_url = "https://api.deepseek.com"
+# API key for the upstream LLM endpoint.
+# Recommended: keep this empty and pass OPENAI_API_KEY via environment variable.
+api_key = ""
+# Compression model identifier.
+model = "deepseek-chat"
+# Maximum completion tokens for compression output.
+max_tokens = 1024
+# Sampling temperature for compression generation.
+temperature = 0.3
+
+# Volcengine Ark alternative:
+# base_url = "https://ark.cn-beijing.volces.com/api/v3"
+# model = "doubao-seed-2-0-pro-260215"
+
+# Generic OpenAI-compatible alternative:
+# base_url = "https://api.openai.com/v1"
+# model = "gpt-4.1-mini"
+
+[token_estimation]
+# Rough estimate: tokens ~= total_characters / chars_per_token.
+chars_per_token = 3

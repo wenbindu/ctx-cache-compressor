@@ -1,0 +1,37 @@
+/target
+/dist/
+/config.toml
+/config.local.toml
+*.local.toml
+*.log
+*.pid
+.env
+.env.*
+!.env.example
+.envrc
+.direnv/
+deploy/systemd/ctx-compressor.env
+deploy/systemd/ctx-cache-compressor.env
+
+# macOS Finder metadata
+.DS_Store
+
+# Editor and local tooling state
+.idea/
+.vscode/
+
+# Local data, replay, and evaluation artifacts
+/data/
+/raw/
+
+# Generated test/load summaries
+/data/reports/test_summary_*.md
+/data/reports/load_test_summary.md
+
+# Generated replay/evaluation artifacts
+/data/reports/replay_*.json
+/data/reports/replay_*.log
+/data/reports/real_jsonl_summary_eval.json
+/data/reports/real_jsonl_summary_eval.md
+/data/reports/threshold_compare_*.json
+/data/reports/threshold_compare_*.md

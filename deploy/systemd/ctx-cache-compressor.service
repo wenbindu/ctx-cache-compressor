@@ -1,0 +1,18 @@
+[Unit]
+Description=ctx-cache-compressor service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ctx-cache-compressor
+Group=ctx-cache-compressor
+WorkingDirectory=/opt/ctx-cache-compressor
+EnvironmentFile=-/etc/ctx-cache-compressor/ctx-cache-compressor.env
+ExecStart=/opt/ctx-cache-compressor/bin/ctx-cache-compressor
+Restart=always
+RestartSec=3
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
