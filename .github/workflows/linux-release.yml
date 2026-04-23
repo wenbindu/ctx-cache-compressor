@@ -1,0 +1,56 @@
+name: linux-release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Cache cargo build artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build Linux release package
+        env:
+          TARGET: x86_64-unknown-linux-gnu
+        run: bash scripts/package_release.sh
+
+      - name: Resolve release asset paths
+        id: assets
+        run: |
+          VERSION="$(awk -F '"' '/^version = / { print $2; exit }' Cargo.toml)"
+          PKG_BASENAME="ctx-cache-compressor-${VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+          echo "archive=dist/${PKG_BASENAME}" >> "$GITHUB_OUTPUT"
+          echo "checksum=dist/${PKG_BASENAME}.sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ctx-cache-compressor-linux-release
+          path: |
+            ${{ steps.assets.outputs.archive }}
+            ${{ steps.assets.outputs.checksum }}
+
+      - name: Publish GitHub release assets
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ steps.assets.outputs.archive }}
+            ${{ steps.assets.outputs.checksum }}
+          generate_release_notes: true

@@ -157,23 +157,27 @@
     }
 
     .header-center {
-      flex: 1 1 0;
+      flex: 1 1 auto;
+      min-width: 0;
       display: flex;
       justify-content: center;
       color: var(--text);
       font-size: 13px;
       font-weight: 600;
       text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .header-right {
-      flex: 1 1 0;
+      flex: 0 0 auto;
       display: flex;
       align-items: center;
       justify-content: flex-end;
       gap: 8px;
       min-width: 0;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
     }
 
     .locale-toggle {
@@ -203,6 +207,7 @@
       text-transform: uppercase;
       letter-spacing: 0.08em;
       white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .status-dot {
@@ -277,6 +282,8 @@
       background: rgba(34, 211, 238, 0.14);
       color: #d7fbff;
       font-weight: 600;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .connect-button:hover:not(:disabled) {

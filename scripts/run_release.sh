@@ -2,12 +2,24 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BINARY="${BINARY:-${ROOT_DIR}/target/release/ctx-cache-compressor}"
+HOST_TARGET="$(rustc -vV | sed -n 's/^host: //p')"
+TARGET_TRIPLE="${TARGET:-${HOST_TARGET}}"
+DEFAULT_BINARY="${ROOT_DIR}/target/${TARGET_TRIPLE}/release/ctx-cache-compressor"
+LEGACY_BINARY="${ROOT_DIR}/target/release/ctx-cache-compressor"
+BINARY="${BINARY:-}"
 CONFIG_FILE="${CONFIG_FILE:-}"
+
+if [[ -z "${BINARY}" ]]; then
+  if [[ -x "${DEFAULT_BINARY}" ]]; then
+    BINARY="${DEFAULT_BINARY}"
+  else
+    BINARY="${LEGACY_BINARY}"
+  fi
+fi
 
 if [[ ! -x "${BINARY}" ]]; then
   echo "release binary not found: ${BINARY}" >&2
-  echo "build it first with: cargo build --release" >&2
+  echo "build it first with: cargo build --release --target ${TARGET_TRIPLE}" >&2
   exit 1
 fi
 
