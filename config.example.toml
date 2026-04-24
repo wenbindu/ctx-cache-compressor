@@ -60,7 +60,7 @@ base_url = "https://api.deepseek.com"
 # Recommended: keep this empty and pass OPENAI_API_KEY via environment variable.
 api_key = ""
 # Compression model identifier.
-model = "deepseek-chat"
+model = "deepseek-v4-flash"
 # Maximum completion tokens for compression output.
 max_tokens = 1024
 # Sampling temperature for compression generation.

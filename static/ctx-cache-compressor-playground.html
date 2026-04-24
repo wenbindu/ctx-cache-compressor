@@ -1329,7 +1329,7 @@
               </section>
 
               <section class="config-section">
-                <h3 data-i18n="section.compressionPolicy">Compression Policy</h3>
+                <h3 data-i18n="section.compressionStrategy">Compression Strategy</h3>
                 <div class="config-rows">
                   <div class="config-row">
                     <span data-i18n="label.model">Model</span>
@@ -1449,7 +1449,7 @@
           </div>
 
           <form id="composer-form" class="composer">
-            <textarea id="composer-input" data-i18n-placeholder="composer.placeholder" placeholder="Type a message..."></textarea>
+            <textarea id="composer-input" placeholder=""></textarea>
             <div class="composer-footer">
               <div id="composer-note" class="composer-note">Ctrl+Enter to send, Enter for a new line.</div>
               <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -1478,23 +1478,19 @@
               </section>
 
               <section class="config-section">
-                <h3 data-i18n="section.compressionPolicy">Compression Policy</h3>
+                <h3 data-i18n="section.conversationModel">Conversation Model</h3>
                 <div class="field">
                   <label for="runtime-llm-base" data-i18n="label.baseUrl">Base URL</label>
                   <input id="runtime-llm-base" placeholder="https://api.deepseek.com">
                 </div>
                 <div class="field">
                   <label for="runtime-llm-api-key" data-i18n="label.apiKey">API Key</label>
-                  <input id="runtime-llm-api-key" type="password" data-i18n-placeholder="placeholder.apiKey" placeholder="Leave blank to keep the current key">
-                  <div id="runtime-config-note" class="field-hint">Loading runtime config...</div>
+                  <input id="runtime-llm-api-key" type="password" data-i18n-placeholder="placeholder.apiKey" placeholder="Enter API key for this conversation model">
+                  <div id="runtime-config-note" class="field-hint"></div>
                 </div>
                 <div class="field">
                   <label for="runtime-llm-model" data-i18n="label.model">Model</label>
-                  <input id="runtime-llm-model" placeholder="deepseek-chat">
-                </div>
-                <div class="field">
-                  <label for="runtime-compression-every-turns" data-i18n="label.compressionFrequency">Compression Frequency</label>
-                  <input id="runtime-compression-every-turns" type="number" min="1" step="1">
+                  <input id="runtime-llm-model" placeholder="deepseek-v4-flash">
                 </div>
                 <div class="settings-actions">
                   <button id="apply-runtime-config" class="header-button primary" type="button" data-i18n="button.applyConfig">Apply Config</button>
@@ -1555,7 +1551,6 @@
       runtimeLlmBaseUrl: "",
       runtimeLlmApiKey: "",
       runtimeLlmModel: "",
-      runtimeCompressionEveryTurns: "",
       context: null,
       lastLatencyMs: null,
       lastRoundtripMs: null,
@@ -1589,7 +1584,8 @@
         "header.center": "Create a session, send messages, and watch context compression evolve in real time.",
         "section.observe": "Observe",
         "section.currentSession": "Current Session",
-        "section.compressionPolicy": "Compression Policy",
+        "section.compressionStrategy": "Compression Strategy",
+        "section.conversationModel": "Conversation Model",
         "section.runtimeMetrics": "Runtime Metrics",
         "section.compressionCurve": "Compression Curve",
         "section.conversation": "Conversation",
@@ -1633,7 +1629,7 @@
         "button.refreshList": "Refresh List",
         "placeholder.composer": "Type a message...",
         "placeholder.currentSession": "Leave blank to use the current session",
-        "placeholder.apiKey": "Leave blank to keep the current key",
+        "placeholder.apiKey": "Enter API key for this conversation model",
         "status.service": "Service",
         "status.compression": "Compression",
         "status.serviceHealthy": "Service healthy · {sessions} sessions",
@@ -1653,8 +1649,9 @@
         "note.refreshingSessions": "Refreshing session list...",
         "note.refreshingContext": "Refreshing context...",
         "note.updatingConfig": "Updating runtime config...",
-        "hint.loadingRuntimeConfig": "Loading runtime config...",
-        "hint.noApiKeyConfigured": "No upstream key configured",
+        "hint.loadingRuntimeConfig": "",
+        "hint.noApiKeyConfigured": "",
+        "hint.apiKeyReady": "",
         "hint.loadingConfig": "Loading config...",
         "hint.sessionCache": "Selecting one syncs the Session ID above. Deleting it clears the in-memory session cache.",
         "hint.configLoaded": "{poll} ms polling · TTL {ttl} s · max {max} sessions",
@@ -1689,7 +1686,8 @@
         "header.center": "先创建会话，再发送消息，观察上下文压缩如何随对话实时变化。",
         "section.observe": "监测",
         "section.currentSession": "当前会话",
-        "section.compressionPolicy": "压缩策略",
+        "section.compressionStrategy": "压缩策略",
+        "section.conversationModel": "对话模型",
         "section.runtimeMetrics": "运行指标",
         "section.compressionCurve": "压缩曲线",
         "section.conversation": "对话",
@@ -1733,7 +1731,7 @@
         "button.refreshList": "刷新列表",
         "placeholder.composer": "输入消息…",
         "placeholder.currentSession": "留空则使用当前会话",
-        "placeholder.apiKey": "留空则保持当前密钥",
+        "placeholder.apiKey": "输入本次对话模型要使用的 API Key",
         "status.service": "服务",
         "status.compression": "压缩",
         "status.serviceHealthy": "服务正常 · {sessions} 个会话",
@@ -1753,8 +1751,9 @@
         "note.refreshingSessions": "正在刷新会话列表…",
         "note.refreshingContext": "正在刷新上下文…",
         "note.updatingConfig": "正在更新运行配置…",
-        "hint.loadingRuntimeConfig": "正在加载运行配置…",
-        "hint.noApiKeyConfigured": "未配置上游密钥",
+        "hint.loadingRuntimeConfig": "",
+        "hint.noApiKeyConfigured": "",
+        "hint.apiKeyReady": "",
         "hint.loadingConfig": "正在加载配置…",
         "hint.sessionCache": "选择后会同步到上方会话 ID；删除会清掉该 session 对应的内存缓存。",
         "hint.configLoaded": "{poll} ms 轮询 · TTL {ttl} 秒 · 最多 {max} 个会话",
@@ -1817,7 +1816,6 @@
       runtimeLlmBase: document.getElementById("runtime-llm-base"),
       runtimeLlmApiKey: document.getElementById("runtime-llm-api-key"),
       runtimeLlmModel: document.getElementById("runtime-llm-model"),
-      runtimeCompressionEveryTurns: document.getElementById("runtime-compression-every-turns"),
       applyRuntimeConfig: document.getElementById("apply-runtime-config"),
       runtimeConfigNote: document.getElementById("runtime-config-note"),
       pollInterval: document.getElementById("poll-interval"),
@@ -1893,6 +1891,40 @@
       }
 
       return "en";
+    }
+
+    function loadStoredConversationConfig() {
+      try {
+        const raw = window.localStorage.getItem("ctx-cache-compressor.conversation-config");
+        if (!raw) {
+          return { baseUrl: "", apiKey: "", model: "" };
+        }
+
+        const parsed = JSON.parse(raw);
+        return {
+          baseUrl: typeof parsed.baseUrl === "string" ? parsed.baseUrl : "",
+          apiKey: typeof parsed.apiKey === "string" ? parsed.apiKey : "",
+          model: typeof parsed.model === "string" ? parsed.model : ""
+        };
+      } catch (error) {
+        console.warn(error);
+        return { baseUrl: "", apiKey: "", model: "" };
+      }
+    }
+
+    function persistConversationConfig() {
+      try {
+        window.localStorage.setItem(
+          "ctx-cache-compressor.conversation-config",
+          JSON.stringify({
+            baseUrl: state.runtimeLlmBaseUrl || "",
+            apiKey: state.runtimeLlmApiKey || "",
+            model: state.runtimeLlmModel || ""
+          })
+        );
+      } catch (error) {
+        console.warn(error);
+      }
     }
 
     function t(key, variables = {}) {
@@ -2069,7 +2101,6 @@
       els.runtimeLlmBase.value = state.runtimeLlmBaseUrl;
       els.runtimeLlmApiKey.value = state.runtimeLlmApiKey;
       els.runtimeLlmModel.value = state.runtimeLlmModel;
-      els.runtimeCompressionEveryTurns.value = state.runtimeCompressionEveryTurns;
       els.pollInterval.value = String(state.pollIntervalMs);
       els.autoRefresh.value = state.autoRefresh ? "on" : "off";
     }
@@ -2164,7 +2195,7 @@
         setNodeValue(els.cfgEveryTurns, "-");
         setNodeValue(els.cfgKeepRecent, "-");
         setNodeValue(els.cfgTimeoutRetries, "-");
-        els.runtimeConfigNote.textContent = t("hint.loadingRuntimeConfig");
+        els.runtimeConfigNote.textContent = "";
         els.configNote.textContent = t("hint.loadingConfig");
         return;
       }
@@ -2177,7 +2208,7 @@
         seconds: state.config.llm_timeout_seconds,
         retries: state.config.max_retries
       }));
-      els.runtimeConfigNote.textContent = state.config.llm_api_key_preview || t("hint.noApiKeyConfigured");
+      els.runtimeConfigNote.textContent = "";
       els.configNote.textContent = t("hint.configLoaded", {
         poll: state.pollIntervalMs,
         ttl: state.config.session_ttl_seconds,
@@ -2416,15 +2447,6 @@
 
     async function loadDemoConfig() {
       state.config = await apiFetch("/demo/config");
-      if (!state.runtimeLlmBaseUrl) {
-        state.runtimeLlmBaseUrl = state.config.llm_base_url || "";
-      }
-      if (!state.runtimeLlmModel) {
-        state.runtimeLlmModel = state.config.llm_model || "";
-      }
-      if (!state.runtimeCompressionEveryTurns) {
-        state.runtimeCompressionEveryTurns = String(state.config.compression_every_n_turns || 1);
-      }
       if (!state.pollIntervalMs) {
         state.pollIntervalMs = state.config.recommended_poll_interval_ms;
       }
@@ -2449,14 +2471,13 @@
 
     async function applyRuntimeConfig() {
       const body = {
-        llm_base_url: (state.runtimeLlmBaseUrl || "").trim(),
-        llm_model: (state.runtimeLlmModel || "").trim(),
-        compression_every_n_turns: Math.max(1, Number(state.runtimeCompressionEveryTurns) || 1)
+        conversation_llm_base_url: (state.runtimeLlmBaseUrl || "").trim(),
+        conversation_llm_model: (state.runtimeLlmModel || "").trim()
       };
 
       const apiKey = (state.runtimeLlmApiKey || "").trim();
       if (apiKey) {
-        body.llm_api_key = apiKey;
+        body.conversation_llm_api_key = apiKey;
       }
 
       state.config = await apiFetch("/demo/config", {
@@ -2464,10 +2485,7 @@
         body: JSON.stringify(body)
       });
 
-      state.runtimeLlmBaseUrl = state.config.llm_base_url || "";
-      state.runtimeLlmModel = state.config.llm_model || "";
-      state.runtimeCompressionEveryTurns = String(state.config.compression_every_n_turns || 1);
-      state.runtimeLlmApiKey = "";
+      persistConversationConfig();
       renderAll();
     }
 
@@ -2632,18 +2650,17 @@
 
     els.runtimeLlmBase.addEventListener("input", () => {
       state.runtimeLlmBaseUrl = els.runtimeLlmBase.value;
+      persistConversationConfig();
     });
 
     els.runtimeLlmApiKey.addEventListener("input", () => {
       state.runtimeLlmApiKey = els.runtimeLlmApiKey.value;
+      persistConversationConfig();
     });
 
     els.runtimeLlmModel.addEventListener("input", () => {
       state.runtimeLlmModel = els.runtimeLlmModel.value;
-    });
-
-    els.runtimeCompressionEveryTurns.addEventListener("input", () => {
-      state.runtimeCompressionEveryTurns = els.runtimeCompressionEveryTurns.value;
+      persistConversationConfig();
     });
 
     els.sessionList.addEventListener("change", async () => {
@@ -2784,6 +2801,10 @@
     });
 
     async function boot() {
+      const storedConversationConfig = loadStoredConversationConfig();
+      state.runtimeLlmBaseUrl = storedConversationConfig.baseUrl;
+      state.runtimeLlmApiKey = storedConversationConfig.apiKey;
+      state.runtimeLlmModel = storedConversationConfig.model;
       state.apiBase = window.location.origin;
       syncInputsFromState();
       await Promise.all([loadHealth(), loadDemoConfig(), loadSessions()]);

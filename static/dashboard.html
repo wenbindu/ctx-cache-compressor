@@ -1048,7 +1048,7 @@
       els.cfgEveryTurns.textContent = `${state.config.compression_every_n_turns} turns`;
       els.cfgKeepRecent.textContent = `${state.config.keep_recent_turns} turns`;
       els.cfgCapacity.textContent = `${state.config.session_ttl_seconds}s / ${state.config.max_sessions}`;
-      els.configNote.textContent = `Upstream base ${state.config.llm_base_url}. Timeout ${state.config.llm_timeout_seconds}s.`;
+      els.configNote.textContent = `Compression base ${state.config.llm_base_url}. Timeout ${state.config.llm_timeout_seconds}s.`;
     }
 
     function renderMessages() {

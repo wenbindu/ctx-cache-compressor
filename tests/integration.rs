@@ -127,8 +127,8 @@ fn build_test_app(config: Arc<AppConfig>, llm: Arc<MockLlm>) -> (Router, Arc<Ses
         config.compression.prompt.clone(),
     ));
     let scheduler = Arc::new(CompressionScheduler::new(
-        runtime.clone(),
         compressor,
+        config.compression.every_n_turns,
         config.compression.keep_recent_turns,
         config.compression.llm_timeout_seconds,
         config.compression.max_retries,
@@ -861,7 +861,8 @@ async fn scenario_compressor_route_serves_chat_and_metrics_shell() {
     assert!(body.contains("Conversation"));
     assert!(body.contains("Observe"));
     assert!(body.contains("Settings"));
-    assert!(body.contains("Compression Policy"));
+    assert!(body.contains("Compression Strategy"));
+    assert!(body.contains("Conversation Model"));
     assert!(body.contains("Current Session"));
     assert!(body.contains("Session Cache"));
     assert!(body.contains("Create Session"));
@@ -1029,25 +1030,30 @@ async fn scenario_demo_config_can_be_updated_at_runtime() {
         Method::PATCH,
         "/demo/config",
         Some(json!({
-            "llm_base_url": "https://api.deepseek.com",
-            "llm_api_key": "sk-test-1234",
-            "llm_model": "deepseek-chat",
-            "compression_every_n_turns": 3
+            "conversation_llm_base_url": "https://api.deepseek.com",
+            "conversation_llm_api_key": "sk-test-1234",
+            "conversation_llm_model": "deepseek-v4-flash"
         })),
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(body["llm_base_url"], "https://api.deepseek.com");
-    assert_eq!(body["llm_model"], "deepseek-chat");
-    assert_eq!(body["compression_every_n_turns"], 3);
-    assert_eq!(body["llm_api_key_configured"], true);
+    assert_eq!(
+        body["conversation_llm_base_url"],
+        "https://api.deepseek.com"
+    );
+    assert_eq!(body["conversation_llm_model"], "deepseek-v4-flash");
+    assert_eq!(body["compression_every_n_turns"], 5);
+    assert_eq!(body["conversation_llm_api_key_configured"], true);
 
     let (status, config_body) = call_json(&app, Method::GET, "/demo/config", None).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(config_body["llm_base_url"], "https://api.deepseek.com");
-    assert_eq!(config_body["llm_model"], "deepseek-chat");
-    assert_eq!(config_body["compression_every_n_turns"], 3);
-    assert_eq!(config_body["llm_api_key_configured"], true);
+    assert_eq!(
+        config_body["conversation_llm_base_url"],
+        "https://api.deepseek.com"
+    );
+    assert_eq!(config_body["conversation_llm_model"], "deepseek-v4-flash");
+    assert_eq!(config_body["compression_every_n_turns"], 5);
+    assert_eq!(config_body["conversation_llm_api_key_configured"], true);
 }
 
 #[tokio::test]

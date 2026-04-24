@@ -106,7 +106,7 @@ impl AppConfig {
             .set_default("compression.warn_on_failure", true)?
             .set_default("llm.base_url", "https://api.deepseek.com")?
             .set_default("llm.api_key", "")?
-            .set_default("llm.model", "deepseek-chat")?
+            .set_default("llm.model", "deepseek-v4-flash")?
             .set_default("llm.max_tokens", 1024)?
             .set_default("llm.temperature", 0.3)?
             .set_default("token_estimation.chars_per_token", 3)?;

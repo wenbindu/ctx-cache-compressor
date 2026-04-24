@@ -23,10 +23,7 @@ pub async fn create_session(
     payload: Option<Json<CreateSessionRequest>>,
 ) -> AppResult<Json<CreateSessionResponse>> {
     let system_prompt = payload.and_then(|json| json.0.system_prompt);
-    let every_n_turns = {
-        let guard = state.runtime.read().await;
-        guard.compression_every_n_turns.max(1)
-    };
+    let every_n_turns = state.config.compression.every_n_turns.max(1);
     let (session_id, session) = state.store.create_session(every_n_turns, system_prompt)?;
 
     let created_at = {

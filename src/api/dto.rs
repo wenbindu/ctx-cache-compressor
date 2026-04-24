@@ -92,6 +92,10 @@ pub struct DemoConfigResponse {
     pub llm_base_url: String,
     pub llm_api_key_configured: bool,
     pub llm_api_key_preview: String,
+    pub conversation_llm_model: String,
+    pub conversation_llm_base_url: String,
+    pub conversation_llm_api_key_configured: bool,
+    pub conversation_llm_api_key_preview: String,
     pub compression_every_n_turns: u32,
     pub keep_recent_turns: u32,
     pub llm_timeout_seconds: u64,
@@ -105,13 +109,14 @@ pub struct DemoConfigResponse {
 #[derive(Debug, Clone, Deserialize)]
 pub struct UpdateDemoConfigRequest {
     #[serde(default)]
-    pub llm_base_url: Option<String>,
+    #[serde(alias = "llm_base_url")]
+    pub conversation_llm_base_url: Option<String>,
     #[serde(default)]
-    pub llm_api_key: Option<String>,
+    #[serde(alias = "llm_api_key")]
+    pub conversation_llm_api_key: Option<String>,
     #[serde(default)]
-    pub llm_model: Option<String>,
-    #[serde(default)]
-    pub compression_every_n_turns: Option<u32>,
+    #[serde(alias = "llm_model")]
+    pub conversation_llm_model: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

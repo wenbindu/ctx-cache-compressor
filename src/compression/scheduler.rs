@@ -9,14 +9,13 @@ use tracing::{info, instrument, warn};
 use crate::{
     compression::compressor::{CompressionOutcome, Compressor},
     error::AppError,
-    runtime::DemoRuntimeConfig,
     session::types::{Session, SessionTraceKind},
 };
 
 #[derive(Clone)]
 pub struct CompressionScheduler {
-    runtime: Arc<RwLock<DemoRuntimeConfig>>,
     compressor: Arc<Compressor>,
+    every_n_turns: u32,
     keep_recent_turns: u32,
     llm_timeout_seconds: u64,
     max_retries: u32,
@@ -25,16 +24,16 @@ pub struct CompressionScheduler {
 
 impl CompressionScheduler {
     pub fn new(
-        runtime: Arc<RwLock<DemoRuntimeConfig>>,
         compressor: Arc<Compressor>,
+        every_n_turns: u32,
         keep_recent_turns: u32,
         llm_timeout_seconds: u64,
         max_retries: u32,
         warn_on_failure: bool,
     ) -> Self {
         Self {
-            runtime,
             compressor,
+            every_n_turns: every_n_turns.max(1),
             keep_recent_turns,
             llm_timeout_seconds,
             max_retries,
@@ -64,10 +63,6 @@ impl CompressionScheduler {
         let timeout = Duration::from_secs(self.llm_timeout_seconds);
         let mut success: Option<CompressionOutcome> = None;
         let mut last_error: Option<AppError> = None;
-        let next_every_n_turns = {
-            let guard = self.runtime.read().await;
-            guard.compression_every_n_turns.max(1)
-        };
 
         while attempt < total_attempts {
             attempt += 1;
@@ -106,7 +101,7 @@ impl CompressionScheduler {
             guard.compressed_turns = guard
                 .compressed_turns
                 .saturating_add(compressed_turns_delta);
-            guard.next_compress_at = guard.turn_count.saturating_add(next_every_n_turns);
+            guard.next_compress_at = guard.turn_count.saturating_add(self.every_n_turns);
             guard.is_compressing.store(false, Ordering::SeqCst);
             guard.touch();
             guard.push_trace(
@@ -121,7 +116,7 @@ impl CompressionScheduler {
 
         let drained_pending: Vec<_> = guard.pending.drain(..).collect();
         guard.stable.extend(drained_pending);
-        guard.next_compress_at = guard.turn_count.saturating_add(next_every_n_turns);
+        guard.next_compress_at = guard.turn_count.saturating_add(self.every_n_turns);
         guard.is_compressing.store(false, Ordering::SeqCst);
         guard.touch();
 

@@ -1,9 +1,6 @@
 use std::time::Instant;
 
-use std::sync::Arc;
-
 use axum::{extract::State, Json};
-use tokio::sync::RwLock;
 use tracing::instrument;
 
 use crate::{
@@ -34,47 +31,34 @@ pub async fn update_demo_config(
     State(state): State<AppState>,
     Json(payload): Json<UpdateDemoConfigRequest>,
 ) -> AppResult<Json<DemoConfigResponse>> {
-    let next_every_n_turns = {
+    {
         let mut guard = state.runtime.write().await;
 
         if let Some(base_url) = payload
-            .llm_base_url
+            .conversation_llm_base_url
             .as_deref()
             .map(str::trim)
             .filter(|value| !value.is_empty())
         {
-            guard.llm.base_url = base_url.to_string();
+            guard.conversation_llm.base_url = base_url.to_string();
         }
 
-        if let Some(api_key) = payload.llm_api_key {
+        if let Some(api_key) = payload.conversation_llm_api_key {
             let trimmed = api_key.trim();
             if !trimmed.is_empty() {
-                guard.llm.api_key = trimmed.to_string();
+                guard.conversation_llm.api_key = trimmed.to_string();
             }
         }
 
         if let Some(model) = payload
-            .llm_model
+            .conversation_llm_model
             .as_deref()
             .map(str::trim)
             .filter(|value| !value.is_empty())
         {
-            guard.llm.model = model.to_string();
+            guard.conversation_llm.model = model.to_string();
         }
-
-        if let Some(every_n_turns) = payload.compression_every_n_turns {
-            if every_n_turns == 0 {
-                return Err(AppError::BadRequest(
-                    "compression_every_n_turns must be greater than 0".to_string(),
-                ));
-            }
-            guard.compression_every_n_turns = every_n_turns;
-        }
-
-        guard.compression_every_n_turns.max(1)
-    };
-
-    align_session_thresholds(&state.store.sessions, next_every_n_turns).await;
+    }
 
     let runtime = {
         let guard = state.runtime.read().await;
@@ -86,11 +70,15 @@ pub async fn update_demo_config(
 
 fn demo_config_response(state: &AppState, runtime: &DemoRuntimeConfig) -> DemoConfigResponse {
     DemoConfigResponse {
-        llm_model: runtime.llm.model.clone(),
-        llm_base_url: runtime.llm.base_url.clone(),
-        llm_api_key_configured: runtime.llm_api_key_configured(),
-        llm_api_key_preview: runtime.llm_api_key_preview(),
-        compression_every_n_turns: runtime.compression_every_n_turns,
+        llm_model: state.config.llm.model.clone(),
+        llm_base_url: state.config.llm.base_url.clone(),
+        llm_api_key_configured: !state.config.llm.api_key.trim().is_empty(),
+        llm_api_key_preview: masked_api_key_preview(&state.config.llm.api_key),
+        conversation_llm_model: runtime.conversation_llm.model.clone(),
+        conversation_llm_base_url: runtime.conversation_llm.base_url.clone(),
+        conversation_llm_api_key_configured: runtime.conversation_llm_api_key_configured(),
+        conversation_llm_api_key_preview: runtime.conversation_llm_api_key_preview(),
+        compression_every_n_turns: state.config.compression.every_n_turns.max(1),
         keep_recent_turns: state.config.compression.keep_recent_turns,
         llm_timeout_seconds: state.config.compression.llm_timeout_seconds,
         max_retries: state.config.compression.max_retries,
@@ -142,10 +130,7 @@ pub async fn demo_chat(
         let system_prompt = requested_system_prompt
             .clone()
             .or_else(|| Some(DASHBOARD_DEFAULT_SYSTEM_PROMPT.to_string()));
-        let every_n_turns = {
-            let guard = state.runtime.read().await;
-            guard.compression_every_n_turns.max(1)
-        };
+        let every_n_turns = state.config.compression.every_n_turns.max(1);
         let (session_id, _) = state.store.create_session(every_n_turns, system_prompt)?;
         session_id
     };
@@ -265,31 +250,15 @@ async fn sync_demo_session_system_prompt(
     Ok(())
 }
 
-async fn align_session_thresholds(
-    sessions: &dashmap::DashMap<String, Arc<RwLock<crate::session::types::Session>>>,
-    every_n_turns: u32,
-) {
-    let every_n_turns = every_n_turns.max(1);
-    let snapshot = sessions
-        .iter()
-        .map(|entry| entry.value().clone())
-        .collect::<Vec<_>>();
-
-    for session in snapshot {
-        let mut guard = session.write().await;
-        let completed = guard.turn_count;
-        let next = if completed == 0 {
-            every_n_turns
-        } else {
-            let remainder = completed % every_n_turns;
-            if remainder == 0 {
-                completed.saturating_add(every_n_turns)
-            } else {
-                completed.saturating_add(every_n_turns - remainder)
-            }
-        };
-        guard.next_compress_at = next.max(1);
+fn masked_api_key_preview(api_key: &str) -> String {
+    let trimmed = api_key.trim();
+    if trimmed.is_empty() {
+        return "未配置".to_string();
     }
+
+    let suffix_chars: Vec<char> = trimmed.chars().rev().take(4).collect();
+    let suffix: String = suffix_chars.into_iter().rev().collect();
+    format!("已配置 · ****{suffix}")
 }
 
 async fn demo_chat_messages(state: &AppState, session_id: &str) -> AppResult<Vec<ChatMessage>> {

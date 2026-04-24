@@ -25,10 +25,7 @@ pub async fn append_message_to_session(
     session_id: &str,
     incoming: Message,
 ) -> AppResult<AppendMessageResponse> {
-    let every_n_turns = {
-        let guard = state.runtime.read().await;
-        guard.compression_every_n_turns.max(1)
-    };
+    let every_n_turns = state.config.compression.every_n_turns.max(1);
     let session = state
         .store
         .get_or_create_with_id(session_id, every_n_turns)?;

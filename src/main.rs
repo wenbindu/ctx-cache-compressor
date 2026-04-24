@@ -5,7 +5,7 @@ use ctx_cache_compressor::{
     compression::{compressor::Compressor, scheduler::CompressionScheduler},
     config::AppConfig,
     llm::{
-        client::{ChatLlm, CompressionLlm},
+        client::{ChatLlm, CompressionLlm, LlmClient},
         runtime_client::RuntimeLlmClient,
     },
     runtime::DemoRuntimeConfig,
@@ -29,16 +29,17 @@ async fn main() -> anyhow::Result<()> {
         .clone()
         .spawn_ttl_cleanup_with_interval(config.server.session_cleanup_interval_seconds);
 
-    let llm_client = Arc::new(RuntimeLlmClient::new(runtime.clone()));
-    let compression_llm: Arc<dyn CompressionLlm> = llm_client.clone();
-    let chat_llm: Arc<dyn ChatLlm> = llm_client;
+    let chat_runtime_llm = Arc::new(RuntimeLlmClient::new(runtime.clone()));
+    let compression_client = Arc::new(LlmClient::new(config.llm.clone())?);
+    let compression_llm: Arc<dyn CompressionLlm> = compression_client;
+    let chat_llm: Arc<dyn ChatLlm> = chat_runtime_llm;
     let compressor = Arc::new(Compressor::new(
         compression_llm,
         config.compression.prompt.clone(),
     ));
     let scheduler = Arc::new(CompressionScheduler::new(
-        runtime.clone(),
         compressor,
+        config.compression.every_n_turns,
         config.compression.keep_recent_turns,
         config.compression.llm_timeout_seconds,
         config.compression.max_retries,

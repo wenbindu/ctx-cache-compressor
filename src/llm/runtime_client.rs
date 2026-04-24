@@ -31,7 +31,7 @@ impl CompressionLlm for RuntimeLlmClient {
         Box::pin(async move {
             let llm_config = {
                 let guard = self.runtime.read().await;
-                guard.llm.clone()
+                guard.conversation_llm.clone()
             };
             let client = LlmClient::new(llm_config)?;
             client.compress(system_prompt, user_prompt).await
@@ -47,7 +47,7 @@ impl ChatLlm for RuntimeLlmClient {
         Box::pin(async move {
             let llm_config = {
                 let guard = self.runtime.read().await;
-                guard.llm.clone()
+                guard.conversation_llm.clone()
             };
             let client = LlmClient::new(llm_config)?;
             client.complete(messages).await
