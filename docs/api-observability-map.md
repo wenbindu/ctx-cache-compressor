@@ -9,7 +9,9 @@ It is intentionally split into:
 
 ## 1. Current Route Map
 
-The router currently exposes the following routes:
+The router always exposes the core service routes. Demo and UI routes are exposed
+only when `server.enable_demo_routes = true`; production configs should usually
+disable them.
 
 | Route | Method | Purpose |
 | --- | --- | --- |
@@ -22,6 +24,8 @@ The router currently exposes the following routes:
 | `/demo/config` | `GET` | Frontend-facing runtime/demo configuration |
 | `/demo/config` | `PATCH` | Update frontend-facing runtime/demo configuration |
 | `/demo/chat` | `POST` | Single-call demo chat flow: append user, run model, append assistant, return full context |
+| `/demo/tool-call` | `POST` | Ask the model to choose a tool from an OpenAI-compatible `tools` array |
+| `/demo/complete` | `POST` | Continue from the current session transcript and append the assistant response |
 | `/sessions` | `POST` | Create a session |
 | `/sessions/{session_id}` | `DELETE` | Delete a session |
 | `/sessions/{session_id}/messages` | `POST` | Append a single message into a session |
@@ -44,6 +48,10 @@ The current playground and dashboard do not call all session APIs directly for c
    - `GET /sessions/{id}/context`
 5. When sending a chat message:
    - `POST /demo/chat`
+6. When manually simulating a tool result in `/compressor`:
+   - `POST /demo/tool-call`
+   - `POST /sessions/{id}/messages`
+   - `POST /demo/complete`
 
 The `/compressor` page specifically performs those calls in browser code here:
 
@@ -114,6 +122,8 @@ Current DTO coverage:
 - `HealthResponse`
 - `DemoConfigResponse`
 - `DemoChatRequest` / `DemoChatResponse`
+- `DemoToolCallRequest` / `DemoToolCallResponse`
+- `DemoCompleteRequest` / `DemoCompleteResponse`
 
 Reference: [src/api/dto.rs](../src/api/dto.rs#L6)
 
@@ -325,8 +335,8 @@ Current internal path:
 4. push `demo_chat_started`
 5. build LLM chat input from the session
    - include `system`, `user`, final `assistant`
-   - exclude `tool` messages
-   - exclude assistant messages that contain `tool_calls`
+   - include assistant messages that contain `tool_calls`
+   - include `tool` messages with their `tool_call_id`
 6. call the chat LLM
 7. measure `completion_latency_ms`
 8. append the assistant response through the same append pipeline
@@ -354,6 +364,54 @@ Worth showing in UI:
 - whether user append triggered compression
 - whether assistant append triggered compression
 - the resulting full context snapshot
+
+### 4.8 `POST /demo/tool-call`
+
+Purpose:
+
+- convenience endpoint for testing OpenAI-compatible tool definitions in the playground
+- appends the user request, sends the session transcript plus `tools` array to the model, and appends either the returned `assistant(tool_calls)` message or a normal assistant reply
+- preserves provider-specific `reasoning_content` from the returned assistant message so `/demo/complete` can pass it back to reasoning models that require it
+
+Current request:
+
+- `session_id` optional
+- `system_prompt` optional
+- `user_message`
+- `tools`: OpenAI-compatible array such as `[{ "type": "function", "function": { "name": "...", "description": "...", "parameters": {...} } }]`
+
+Current response:
+
+- `session_id`
+- `tool_call_count`
+- `user_append`
+- `assistant_append`
+- `context`
+
+### 4.9 `POST /demo/complete`
+
+Purpose:
+
+- convenience endpoint for manual tool-call simulation in the playground
+- reads the current session transcript, calls the configured chat model, and appends the final assistant message
+
+Current internal path:
+
+1. validate that `session_id` exists
+2. push `demo_chat_started`
+3. build LLM chat input from the full session, including `assistant(tool_calls)`, optional `reasoning_content`, and `tool` messages
+4. call the chat LLM with the configured timeout
+5. append the returned assistant text through the same append pipeline
+6. push `demo_chat_completed` or `demo_chat_failed`
+7. fetch and return the full context
+
+Current response:
+
+- `session_id`
+- `assistant_message`
+- `completion_latency_ms`
+- `assistant_append`
+- `context`
 
 ## 5. Compression Path
 

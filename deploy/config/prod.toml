@@ -4,6 +4,8 @@ port = 8080
 max_sessions = 10000
 session_ttl_seconds = 3600
 session_cleanup_interval_seconds = 30
+enable_demo_routes = false
+permissive_cors = false
 
 [compression]
 every_n_turns = 5
@@ -21,4 +23,3 @@ temperature = 0.2
 
 [token_estimation]
 chars_per_token = 3
-

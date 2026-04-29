@@ -1,18 +1,21 @@
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use axum::{extract::State, Json};
 use tracing::instrument;
 
 use crate::{
     api::{
-        dto::{DemoChatRequest, DemoChatResponse, DemoConfigResponse, UpdateDemoConfigRequest},
+        dto::{
+            DemoChatRequest, DemoChatResponse, DemoCompleteRequest, DemoCompleteResponse,
+            DemoConfigResponse, DemoToolCallRequest, DemoToolCallResponse, UpdateDemoConfigRequest,
+        },
         handlers::{append::append_message_to_session, fetch::fetch_context_response},
         AppState,
     },
     error::{AppError, AppResult},
-    llm::types::ChatMessage,
+    llm::types::{ChatMessage, ChatMessageResponse},
     runtime::DemoRuntimeConfig,
-    session::types::{Message, Role, SessionTraceKind},
+    session::types::{Message, MessageContent, Role, SessionTraceKind},
 };
 
 const DASHBOARD_DEFAULT_SYSTEM_PROMPT: &str = "You are an observability-first assistant. Answer clearly, preserve key facts, and help the operator understand when compression changes the active context.";
@@ -152,25 +155,42 @@ pub async fn demo_chat(
 
     let chat_messages = demo_chat_messages(&state, &session_id).await?;
     let started_at = Instant::now();
-    let assistant_message = match state.chat_llm.complete(&chat_messages).await {
-        Ok(message) => message,
-        Err(err) => {
-            push_trace(
-                &state,
-                &session_id,
-                SessionTraceKind::DemoChatFailed,
-                format!("demo chat failed before assistant append: {err}"),
-            )
-            .await;
-            return Err(err);
-        }
-    };
+    let timeout = Duration::from_secs(state.config.compression.llm_timeout_seconds);
+    let assistant_response =
+        match tokio::time::timeout(timeout, state.chat_llm.complete(&chat_messages)).await {
+            Ok(Ok(message)) => message,
+            Ok(Err(err)) => {
+                push_trace(
+                    &state,
+                    &session_id,
+                    SessionTraceKind::DemoChatFailed,
+                    format!("demo chat failed before assistant append: {err}"),
+                )
+                .await;
+                return Err(err);
+            }
+            Err(_) => {
+                let err = AppError::Timeout(format!(
+                    "demo chat timeout after {} seconds",
+                    state.config.compression.llm_timeout_seconds
+                ));
+                push_trace(
+                    &state,
+                    &session_id,
+                    SessionTraceKind::DemoChatFailed,
+                    format!("demo chat failed before assistant append: {err}"),
+                )
+                .await;
+                return Err(err);
+            }
+        };
     let completion_latency_ms = started_at.elapsed().as_millis();
+    let assistant_message = assistant_text(&assistant_response)?;
 
     let assistant_append = match append_message_to_session(
         &state,
         &session_id,
-        Message::text(Role::Assistant, assistant_message.clone()),
+        assistant_response_to_message(assistant_response),
     )
     .await
     {
@@ -201,6 +221,263 @@ pub async fn demo_chat(
         session_id,
         assistant_message,
         completion_latency_ms,
+        user_append,
+        assistant_append,
+        context,
+    }))
+}
+
+#[instrument(skip(state, payload))]
+pub async fn demo_complete(
+    State(state): State<AppState>,
+    Json(payload): Json<DemoCompleteRequest>,
+) -> AppResult<Json<DemoCompleteResponse>> {
+    let session_id = payload.session_id.trim().to_string();
+    if session_id.is_empty() {
+        return Err(AppError::BadRequest(
+            "session_id cannot be empty".to_string(),
+        ));
+    }
+
+    if state.store.get(&session_id).is_none() {
+        return Err(AppError::NotFound(format!(
+            "session '{}' not found",
+            session_id
+        )));
+    }
+
+    push_trace(
+        &state,
+        &session_id,
+        SessionTraceKind::DemoChatStarted,
+        "demo completion requested from current transcript",
+    )
+    .await;
+
+    let chat_messages = demo_chat_messages(&state, &session_id).await?;
+    let started_at = Instant::now();
+    let timeout = Duration::from_secs(state.config.compression.llm_timeout_seconds);
+    let assistant_response =
+        match tokio::time::timeout(timeout, state.chat_llm.complete(&chat_messages)).await {
+            Ok(Ok(message)) => message,
+            Ok(Err(err)) => {
+                push_trace(
+                    &state,
+                    &session_id,
+                    SessionTraceKind::DemoChatFailed,
+                    format!("demo completion failed before assistant append: {err}"),
+                )
+                .await;
+                return Err(err);
+            }
+            Err(_) => {
+                let err = AppError::Timeout(format!(
+                    "demo completion timeout after {} seconds",
+                    state.config.compression.llm_timeout_seconds
+                ));
+                push_trace(
+                    &state,
+                    &session_id,
+                    SessionTraceKind::DemoChatFailed,
+                    format!("demo completion failed before assistant append: {err}"),
+                )
+                .await;
+                return Err(err);
+            }
+        };
+    let completion_latency_ms = started_at.elapsed().as_millis();
+    let assistant_message = assistant_text(&assistant_response)?;
+
+    let assistant_append = match append_message_to_session(
+        &state,
+        &session_id,
+        assistant_response_to_message(assistant_response),
+    )
+    .await
+    {
+        Ok(response) => response,
+        Err(err) => {
+            push_trace(
+                &state,
+                &session_id,
+                SessionTraceKind::DemoChatFailed,
+                format!("assistant append failed after demo completion: {err}"),
+            )
+            .await;
+            return Err(err);
+        }
+    };
+
+    push_trace(
+        &state,
+        &session_id,
+        SessionTraceKind::DemoChatCompleted,
+        format!("demo completion finished in {completion_latency_ms} ms"),
+    )
+    .await;
+
+    let context = fetch_context_response(&state, &session_id).await?;
+
+    Ok(Json(DemoCompleteResponse {
+        session_id,
+        assistant_message,
+        completion_latency_ms,
+        assistant_append,
+        context,
+    }))
+}
+
+#[instrument(skip(state, payload))]
+pub async fn demo_tool_call(
+    State(state): State<AppState>,
+    Json(payload): Json<DemoToolCallRequest>,
+) -> AppResult<Json<DemoToolCallResponse>> {
+    let user_message = payload.user_message.trim().to_string();
+    if user_message.is_empty() {
+        return Err(AppError::BadRequest(
+            "user_message cannot be empty".to_string(),
+        ));
+    }
+    if payload.tools.is_empty() {
+        return Err(AppError::BadRequest("tools cannot be empty".to_string()));
+    }
+
+    let requested_system_prompt = payload
+        .system_prompt
+        .as_deref()
+        .map(str::trim)
+        .filter(|text| !text.is_empty())
+        .map(|text| text.to_string());
+
+    let session_id = if let Some(raw_session_id) = payload
+        .session_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        if state.store.get(raw_session_id).is_none() {
+            return Err(AppError::NotFound(format!(
+                "session '{}' not found",
+                raw_session_id
+            )));
+        }
+
+        if let Some(system_prompt) = requested_system_prompt.as_deref() {
+            sync_demo_session_system_prompt(&state, raw_session_id, system_prompt).await?;
+        }
+
+        raw_session_id.to_string()
+    } else {
+        let system_prompt = requested_system_prompt
+            .clone()
+            .or_else(|| Some(DASHBOARD_DEFAULT_SYSTEM_PROMPT.to_string()));
+        let every_n_turns = state.config.compression.every_n_turns.max(1);
+        let (session_id, _) = state.store.create_session(every_n_turns, system_prompt)?;
+        session_id
+    };
+
+    push_trace(
+        &state,
+        &session_id,
+        SessionTraceKind::DemoChatStarted,
+        "demo tool-call completion requested",
+    )
+    .await;
+
+    let mut chat_messages = match demo_chat_messages(&state, &session_id).await {
+        Ok(messages) => messages,
+        Err(AppError::Conflict(_)) => Vec::new(),
+        Err(err) => return Err(err),
+    };
+    let pending_tool_call_ids = pending_tool_call_ids(&chat_messages);
+    if !pending_tool_call_ids.is_empty() {
+        return Err(AppError::Conflict(format!(
+            "pending tool_call requires a matching role=tool result before continuing: {}",
+            pending_tool_call_ids.join(", ")
+        )));
+    }
+
+    chat_messages.push(ChatMessage {
+        role: "user".to_string(),
+        content: Some(user_message.clone()),
+        reasoning_content: None,
+        tool_calls: None,
+        tool_call_id: None,
+        name: None,
+    });
+    let timeout = Duration::from_secs(state.config.compression.llm_timeout_seconds);
+    let assistant_message = match tokio::time::timeout(
+        timeout,
+        state
+            .chat_llm
+            .complete_tool_call(&chat_messages, &payload.tools),
+    )
+    .await
+    {
+        Ok(Ok(message)) => message,
+        Ok(Err(err)) => {
+            push_trace(
+                &state,
+                &session_id,
+                SessionTraceKind::DemoChatFailed,
+                format!("demo tool-call completion failed before assistant append: {err}"),
+            )
+            .await;
+            return Err(err);
+        }
+        Err(_) => {
+            let err = AppError::Timeout(format!(
+                "demo tool-call completion timeout after {} seconds",
+                state.config.compression.llm_timeout_seconds
+            ));
+            push_trace(
+                &state,
+                &session_id,
+                SessionTraceKind::DemoChatFailed,
+                format!("demo tool-call completion failed before assistant append: {err}"),
+            )
+            .await;
+            return Err(err);
+        }
+    };
+
+    let tool_call_count = assistant_message
+        .tool_calls
+        .as_ref()
+        .map(Vec::len)
+        .unwrap_or_default();
+
+    let user_append = append_message_to_session(
+        &state,
+        &session_id,
+        Message::text(Role::User, user_message.clone()),
+    )
+    .await?;
+
+    let assistant_append = append_message_to_session(
+        &state,
+        &session_id,
+        assistant_response_to_message(assistant_message),
+    )
+    .await?;
+
+    push_trace(
+        &state,
+        &session_id,
+        SessionTraceKind::DemoChatCompleted,
+        if tool_call_count > 0 {
+            format!("demo tool-call completion returned {tool_call_count} tool call(s)")
+        } else {
+            "demo tool-call completion returned final assistant content".to_string()
+        },
+    )
+    .await;
+
+    let context = fetch_context_response(&state, &session_id).await?;
+
+    Ok(Json(DemoToolCallResponse {
+        session_id,
+        tool_call_count,
         user_append,
         assistant_append,
         context,
@@ -291,19 +568,70 @@ fn message_to_chat_message(message: &Message) -> Option<ChatMessage> {
     let role = match message.role {
         Role::System => "system",
         Role::User => "user",
-        Role::Assistant if !message.has_tool_calls() => "assistant",
-        Role::Assistant | Role::Tool => return None,
+        Role::Assistant => "assistant",
+        Role::Tool => "tool",
     };
 
     let content = message.content_text().trim().to_string();
-    if content.is_empty() {
+    let has_tool_calls = message.has_tool_calls();
+    if content.is_empty() && !has_tool_calls {
         return None;
     }
 
     Some(ChatMessage {
         role: role.to_string(),
-        content,
+        content: if content.is_empty() {
+            None
+        } else {
+            Some(content)
+        },
+        reasoning_content: message.reasoning_content.clone(),
+        tool_calls: message.tool_calls.clone(),
+        tool_call_id: message.tool_call_id.clone(),
+        name: message.name.clone(),
     })
+}
+
+fn assistant_text(response: &ChatMessageResponse) -> AppResult<String> {
+    response
+        .content
+        .as_ref()
+        .map(|text| text.trim().to_string())
+        .filter(|text| !text.is_empty())
+        .ok_or_else(|| AppError::Upstream("empty completion response".to_string()))
+}
+
+fn assistant_response_to_message(response: ChatMessageResponse) -> Message {
+    Message {
+        role: Role::Assistant,
+        content: response
+            .content
+            .filter(|content| !content.trim().is_empty())
+            .map(MessageContent::Text),
+        reasoning_content: response
+            .reasoning_content
+            .filter(|content| !content.trim().is_empty()),
+        tool_calls: response.tool_calls.filter(|calls| !calls.is_empty()),
+        tool_call_id: None,
+        name: None,
+    }
+}
+
+fn pending_tool_call_ids(messages: &[ChatMessage]) -> Vec<String> {
+    let resolved = messages
+        .iter()
+        .filter(|message| message.role == "tool")
+        .filter_map(|message| message.tool_call_id.as_deref())
+        .collect::<std::collections::HashSet<_>>();
+
+    messages
+        .iter()
+        .filter(|message| message.role == "assistant")
+        .filter_map(|message| message.tool_calls.as_ref())
+        .flat_map(|tool_calls| tool_calls.iter())
+        .filter(|tool_call| !resolved.contains(tool_call.id.as_str()))
+        .map(|tool_call| tool_call.id.clone())
+        .collect()
 }
 
 async fn push_trace(

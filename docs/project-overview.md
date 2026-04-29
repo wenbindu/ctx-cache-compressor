@@ -97,12 +97,20 @@ That design allows:
 - `GET /demo/config`
 - `PATCH /demo/config`
 - `POST /demo/chat`
+- `POST /demo/tool-call`
+- `POST /demo/complete`
 
 ### UI routes
 
 - `/compressor`
 - `/ex/dashboard`
 - `/ex/playground`
+
+Demo and UI routes are controlled by `server.enable_demo_routes`. Production
+configs should usually keep them disabled and expose only the core API.
+`/demo/tool-call` accepts an OpenAI-compatible `tools` array for playground tool
+simulation. `/demo/complete` continues after a manual tool result has already
+been appended.
 
 ## 5. Recommended Mental Model
 

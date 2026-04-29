@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 use crate::session::types::Message;
 
@@ -15,17 +15,20 @@ pub fn is_at_turn_boundary(messages: &[Message]) -> bool {
 }
 
 pub fn all_tool_calls_resolved(messages: &[Message]) -> bool {
-    let issued_calls: HashSet<&str> = messages
+    let mut issued_calls = HashMap::new();
+    for call_id in messages
         .iter()
         .filter_map(|m| m.tool_calls.as_ref())
         .flatten()
         .map(|tc| tc.id.as_str())
-        .collect();
+    {
+        *issued_calls.entry(call_id).or_insert(0usize) += 1;
+    }
 
-    let resolved_calls: HashSet<&str> = messages
-        .iter()
-        .filter_map(|m| m.tool_call_id.as_deref())
-        .collect();
+    let mut resolved_calls = HashMap::new();
+    for call_id in messages.iter().filter_map(|m| m.tool_call_id.as_deref()) {
+        *resolved_calls.entry(call_id).or_insert(0usize) += 1;
+    }
 
     issued_calls == resolved_calls
 }
@@ -82,6 +85,7 @@ mod tests {
         Message {
             role: Role::Assistant,
             content: None,
+            reasoning_content: None,
             tool_calls: Some(vec![ToolCall {
                 id: id.to_string(),
                 call_type: "function".to_string(),
@@ -99,6 +103,7 @@ mod tests {
         Message {
             role: Role::Tool,
             content: Some(MessageContent::Text("result".to_string())),
+            reasoning_content: None,
             tool_calls: None,
             tool_call_id: Some(id.to_string()),
             name: Some("search".to_string()),
@@ -131,6 +136,19 @@ mod tests {
         ];
         assert!(all_tool_calls_resolved(&messages));
         assert!(is_at_turn_boundary(&messages));
+    }
+
+    #[test]
+    fn duplicate_tool_result_is_not_resolved_boundary() {
+        let messages = vec![
+            user("hi"),
+            assistant_tool_call("call_1"),
+            tool("call_1"),
+            tool("call_1"),
+            assistant("done"),
+        ];
+        assert!(!all_tool_calls_resolved(&messages));
+        assert!(!is_at_turn_boundary(&messages));
     }
 
     #[test]

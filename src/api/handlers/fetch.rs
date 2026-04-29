@@ -30,7 +30,8 @@ pub async fn fetch_context_response(
         stable_message_count,
         pending_message_count,
     ) = {
-        let guard = session.read().await;
+        let mut guard = session.write().await;
+        guard.touch();
         let mut messages = guard.stable.clone();
         messages.extend(guard.pending.clone());
 

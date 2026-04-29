@@ -150,6 +150,7 @@ mod tests {
         Message {
             role: Role::Assistant,
             content: None,
+            reasoning_content: None,
             tool_calls: Some(vec![ToolCall {
                 id: id.to_string(),
                 call_type: "function".to_string(),
@@ -167,6 +168,7 @@ mod tests {
         Message {
             role: Role::Tool,
             content: Some(MessageContent::Text("result".to_string())),
+            reasoning_content: None,
             tool_calls: None,
             tool_call_id: Some(id.to_string()),
             name: Some("search".to_string()),

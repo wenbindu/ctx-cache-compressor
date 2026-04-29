@@ -6,7 +6,9 @@ use tracing::instrument;
 use crate::{
     config::LlmConfig,
     error::{AppError, AppResult},
-    llm::types::{ChatCompletionRequest, ChatCompletionResponse, ChatMessage},
+    llm::types::{
+        ChatCompletionRequest, ChatCompletionResponse, ChatMessage, ChatMessageResponse, ToolSpec,
+    },
 };
 
 pub trait CompressionLlm: Send + Sync {
@@ -21,7 +23,13 @@ pub trait ChatLlm: Send + Sync {
     fn complete<'a>(
         &'a self,
         messages: &'a [ChatMessage],
-    ) -> Pin<Box<dyn Future<Output = AppResult<String>> + Send + 'a>>;
+    ) -> Pin<Box<dyn Future<Output = AppResult<ChatMessageResponse>> + Send + 'a>>;
+
+    fn complete_tool_call<'a>(
+        &'a self,
+        messages: &'a [ChatMessage],
+        tools: &'a [ToolSpec],
+    ) -> Pin<Box<dyn Future<Output = AppResult<ChatMessageResponse>> + Send + 'a>>;
 }
 
 #[derive(Debug, Clone)]
@@ -57,12 +65,17 @@ impl LlmClient {
     }
 
     #[instrument(skip(self, messages))]
-    async fn request_chat(&self, messages: &[ChatMessage]) -> AppResult<String> {
+    async fn request_chat_message(
+        &self,
+        messages: &[ChatMessage],
+        tools: Option<Vec<ToolSpec>>,
+    ) -> AppResult<ChatMessageResponse> {
         let payload = ChatCompletionRequest {
             model: self.config.model.clone(),
             messages: messages.to_vec(),
             max_tokens: self.config.max_tokens,
             temperature: self.config.temperature,
+            tools,
         };
 
         let response = self
@@ -83,7 +96,33 @@ impl LlmClient {
         let body: ChatCompletionResponse = response.json().await?;
         body.choices
             .first()
-            .and_then(|choice| choice.message.content.as_ref())
+            .map(|choice| choice.message.clone())
+            .filter(|message| {
+                message
+                    .content
+                    .as_ref()
+                    .map(|text| !text.trim().is_empty())
+                    .unwrap_or(false)
+                    || message
+                        .tool_calls
+                        .as_ref()
+                        .map(|calls| !calls.is_empty())
+                        .unwrap_or(false)
+            })
+            .ok_or_else(|| AppError::Upstream("empty completion response".to_string()))
+    }
+
+    #[instrument(skip(self, messages))]
+    async fn request_chat(&self, messages: &[ChatMessage]) -> AppResult<ChatMessageResponse> {
+        self.request_chat_message(messages, None).await
+    }
+
+    #[instrument(skip(self, messages))]
+    async fn request_chat_text(&self, messages: &[ChatMessage]) -> AppResult<String> {
+        self.request_chat_message(messages, None)
+            .await?
+            .content
+            .as_ref()
             .map(|text| text.trim().to_string())
             .filter(|text| !text.is_empty())
             .ok_or_else(|| AppError::Upstream("empty completion response".to_string()))
@@ -95,14 +134,22 @@ impl LlmClient {
         system_prompt: &str,
         user_prompt: &str,
     ) -> AppResult<String> {
-        self.request_chat(&[
+        self.request_chat_text(&[
             ChatMessage {
                 role: "system".to_string(),
-                content: system_prompt.to_string(),
+                content: Some(system_prompt.to_string()),
+                reasoning_content: None,
+                tool_calls: None,
+                tool_call_id: None,
+                name: None,
             },
             ChatMessage {
                 role: "user".to_string(),
-                content: user_prompt.to_string(),
+                content: Some(user_prompt.to_string()),
+                reasoning_content: None,
+                tool_calls: None,
+                tool_call_id: None,
+                name: None,
             },
         ])
         .await
@@ -123,7 +170,18 @@ impl ChatLlm for LlmClient {
     fn complete<'a>(
         &'a self,
         messages: &'a [ChatMessage],
-    ) -> Pin<Box<dyn Future<Output = AppResult<String>> + Send + 'a>> {
+    ) -> Pin<Box<dyn Future<Output = AppResult<ChatMessageResponse>> + Send + 'a>> {
         Box::pin(async move { self.request_chat(messages).await })
+    }
+
+    fn complete_tool_call<'a>(
+        &'a self,
+        messages: &'a [ChatMessage],
+        tools: &'a [ToolSpec],
+    ) -> Pin<Box<dyn Future<Output = AppResult<ChatMessageResponse>> + Send + 'a>> {
+        Box::pin(async move {
+            self.request_chat_message(messages, Some(tools.to_vec()))
+                .await
+        })
     }
 }

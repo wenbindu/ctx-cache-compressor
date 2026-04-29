@@ -121,8 +121,10 @@ mod tests {
     #[test]
     fn can_disable_language_instruction_by_config() {
         let messages = vec![Message::text(Role::User, "Please summarize this chat.")];
-        let mut cfg = CompressionPromptConfig::default();
-        cfg.enforce_dominant_language = false;
+        let cfg = CompressionPromptConfig {
+            enforce_dominant_language: false,
+            ..CompressionPromptConfig::default()
+        };
         let (system_prompt, _user_prompt) =
             build_compression_prompts(&messages, 1, &cfg).expect("prompt should build");
         assert!(!system_prompt.contains("主要语言判定为"));

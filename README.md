@@ -91,6 +91,15 @@ Open the playground:
 http://127.0.0.1:8080/compressor
 ```
 
+For production core API deployments, disable local demo surfaces and permissive
+CORS in your config:
+
+```toml
+[server]
+enable_demo_routes = false
+permissive_cors = false
+```
+
 ## Core Routes
 
 - `POST /sessions`
@@ -105,12 +114,22 @@ Demo helpers:
 - `GET /demo/config`
 - `PATCH /demo/config`
 - `POST /demo/chat`
+- `POST /demo/tool-call`
+- `POST /demo/complete`
 
 UI routes:
 
 - `/compressor`
 - `/ex/dashboard`
 - `/ex/playground`
+
+The demo and UI routes are available only when `server.enable_demo_routes = true`.
+`/demo/tool-call` accepts an OpenAI-compatible `tools` array and asks the
+configured conversation model to choose between a normal assistant reply and
+`assistant(tool_calls)`. `/demo/complete` continues after the matching `tool`
+result has been appended. If the upstream model returns provider-specific
+`reasoning_content`, the demo preserves it in the assistant message and sends it
+back on continuation requests.
 
 ## Recommended Production Flow
 

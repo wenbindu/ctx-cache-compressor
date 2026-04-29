@@ -1,7 +1,10 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::session::types::{Message, MessageContent, Role, SessionTraceEvent, ToolCall};
+use crate::{
+    llm::types::ToolSpec,
+    session::types::{Message, MessageContent, Role, SessionTraceEvent, ToolCall},
+};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct CreateSessionRequest {
@@ -36,6 +39,8 @@ pub struct AppendMessageRequest {
     #[serde(default)]
     pub content: Option<MessageContent>,
     #[serde(default)]
+    pub reasoning_content: Option<String>,
+    #[serde(default)]
     pub tool_calls: Option<Vec<ToolCall>>,
     #[serde(default)]
     pub tool_call_id: Option<String>,
@@ -48,6 +53,7 @@ impl From<AppendMessageRequest> for Message {
         Message {
             role: value.role,
             content: value.content,
+            reasoning_content: value.reasoning_content,
             tool_calls: value.tool_calls,
             tool_call_id: value.tool_call_id,
             name: value.name,
@@ -133,6 +139,39 @@ pub struct DemoChatResponse {
     pub session_id: String,
     pub assistant_message: String,
     pub completion_latency_ms: u128,
+    pub user_append: AppendMessageResponse,
+    pub assistant_append: AppendMessageResponse,
+    pub context: FetchContextResponse,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct DemoCompleteRequest {
+    pub session_id: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DemoCompleteResponse {
+    pub session_id: String,
+    pub assistant_message: String,
+    pub completion_latency_ms: u128,
+    pub assistant_append: AppendMessageResponse,
+    pub context: FetchContextResponse,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct DemoToolCallRequest {
+    #[serde(default)]
+    pub session_id: Option<String>,
+    #[serde(default)]
+    pub system_prompt: Option<String>,
+    pub user_message: String,
+    pub tools: Vec<ToolSpec>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DemoToolCallResponse {
+    pub session_id: String,
+    pub tool_call_count: usize,
     pub user_append: AppendMessageResponse,
     pub assistant_append: AppendMessageResponse,
     pub context: FetchContextResponse,

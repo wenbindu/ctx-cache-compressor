@@ -6,7 +6,7 @@ use crate::{
     error::AppResult,
     llm::{
         client::{ChatLlm, CompressionLlm, LlmClient},
-        types::ChatMessage,
+        types::{ChatMessage, ChatMessageResponse, ToolSpec},
     },
     runtime::DemoRuntimeConfig,
 };
@@ -43,7 +43,7 @@ impl ChatLlm for RuntimeLlmClient {
     fn complete<'a>(
         &'a self,
         messages: &'a [ChatMessage],
-    ) -> Pin<Box<dyn Future<Output = AppResult<String>> + Send + 'a>> {
+    ) -> Pin<Box<dyn Future<Output = AppResult<ChatMessageResponse>> + Send + 'a>> {
         Box::pin(async move {
             let llm_config = {
                 let guard = self.runtime.read().await;
@@ -51,6 +51,21 @@ impl ChatLlm for RuntimeLlmClient {
             };
             let client = LlmClient::new(llm_config)?;
             client.complete(messages).await
+        })
+    }
+
+    fn complete_tool_call<'a>(
+        &'a self,
+        messages: &'a [ChatMessage],
+        tools: &'a [ToolSpec],
+    ) -> Pin<Box<dyn Future<Output = AppResult<ChatMessageResponse>> + Send + 'a>> {
+        Box::pin(async move {
+            let llm_config = {
+                let guard = self.runtime.read().await;
+                guard.conversation_llm.clone()
+            };
+            let client = LlmClient::new(llm_config)?;
+            client.complete_tool_call(messages, tools).await
         })
     }
 }

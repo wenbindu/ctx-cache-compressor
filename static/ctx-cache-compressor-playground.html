@@ -496,6 +496,17 @@
       border-color: rgba(34, 211, 238, 0.18);
     }
 
+    .message.tool {
+      max-width: 92%;
+      background: rgba(16, 185, 129, 0.07);
+      border-color: rgba(16, 185, 129, 0.18);
+    }
+
+    .message.loading {
+      border-color: rgba(245, 158, 11, 0.2);
+      background: rgba(245, 158, 11, 0.06);
+    }
+
     .message.summary {
       max-width: 100%;
       border-style: dashed;
@@ -515,6 +526,144 @@
       line-height: 1.6;
       white-space: pre-wrap;
       word-break: break-word;
+    }
+
+    .typing-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted-strong);
+    }
+
+    .typing-dots {
+      display: inline-flex;
+      gap: 4px;
+      transform: translateY(1px);
+    }
+
+    .typing-dots span {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--warning);
+      opacity: 0.35;
+      animation: typing-pulse 1.05s infinite ease-in-out;
+    }
+
+    .typing-dots span:nth-child(2) {
+      animation-delay: 0.15s;
+    }
+
+    .typing-dots span:nth-child(3) {
+      animation-delay: 0.3s;
+    }
+
+    @keyframes typing-pulse {
+      0%, 80%, 100% {
+        opacity: 0.3;
+        transform: translateY(0);
+      }
+      40% {
+        opacity: 1;
+        transform: translateY(-2px);
+      }
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      background: rgba(0, 0, 0, 0.64);
+      backdrop-filter: blur(10px);
+    }
+
+    .modal-backdrop.hidden {
+      display: none;
+    }
+
+    .modal-dialog {
+      width: min(500px, 100%);
+      border: 1px solid rgba(245, 158, 11, 0.28);
+      border-radius: 8px;
+      background: #080808;
+      box-shadow: 0 22px 80px rgba(0, 0, 0, 0.52);
+      overflow: hidden;
+    }
+
+    .modal-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px 16px 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .modal-title {
+      margin: 0;
+      color: var(--text);
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1.25;
+    }
+
+    .modal-kicker {
+      margin: 0 0 6px;
+      color: var(--warning);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .modal-body {
+      display: grid;
+      gap: 14px;
+      padding: 15px 16px;
+      color: var(--muted-strong);
+      font-size: 13px;
+      line-height: 1.58;
+    }
+
+    .modal-body p {
+      margin: 0;
+    }
+
+    .modal-kv {
+      display: grid;
+      grid-template-columns: 96px minmax(0, 1fr);
+      gap: 8px 10px;
+      padding: 11px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .modal-kv span {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .modal-kv strong {
+      min-width: 0;
+      color: var(--text);
+      font-size: 12.5px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      overflow-wrap: anywhere;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      padding: 12px 16px 16px;
+      border-top: 1px solid var(--line);
     }
 
     .empty-state {
@@ -541,6 +690,62 @@
       border-top: 1px solid rgba(255, 255, 255, 0.06);
       background: linear-gradient(180deg, rgba(5, 5, 5, 0), rgba(5, 5, 5, 0.92) 20px, #050505 100%);
       z-index: 1;
+    }
+
+    .tool-simulator {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex-shrink: 0;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .tool-simulator-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .tool-simulator-body {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      max-height: min(44vh, 440px);
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+
+    .tool-simulator-body.hidden {
+      display: none;
+    }
+
+    .tool-simulator .field.wide,
+    .tool-simulator .settings-actions {
+      grid-column: 1 / -1;
+    }
+
+    .tool-simulator textarea {
+      min-height: 52px;
+    }
+
+    .tool-status {
+      grid-column: 1 / -1;
+      min-height: 20px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .tool-status.error {
+      color: var(--danger);
+    }
+
+    .tool-status.ok {
+      color: var(--success);
     }
 
     .composer textarea,
@@ -1448,6 +1653,40 @@
             <div class="empty-state">No session yet. Create one, then send your first message.</div>
           </div>
 
+          <section class="tool-simulator">
+            <div class="tool-simulator-head">
+              <button id="tool-sim-toggle" class="header-button primary" type="button" data-i18n="button.toolSimulator">Pending Tool Call</button>
+            </div>
+            <div id="tool-sim-body" class="tool-simulator-body">
+              <div class="field">
+                <label for="tool-role" data-i18n="label.toolRole">Message Role</label>
+                <input id="tool-role" value="tool" readonly>
+              </div>
+              <div class="field">
+                <label for="tool-name" data-i18n="label.toolName">Tool Name</label>
+                <input id="tool-name" value="" readonly>
+              </div>
+              <div class="field">
+                <label for="tool-call-id" data-i18n="label.toolCallId">tool_call_id</label>
+                <input id="tool-call-id" value="" readonly>
+              </div>
+              <div class="field wide">
+                <label for="tool-arguments" data-i18n="label.toolArguments">Tool Arguments JSON</label>
+                <textarea id="tool-arguments" readonly></textarea>
+              </div>
+              <div class="field wide">
+                <label for="tool-result" data-i18n="label.toolResult">Tool Message Content</label>
+                <textarea id="tool-result" data-i18n-placeholder="placeholder.toolResult" placeholder="声音已经调整为30"></textarea>
+              </div>
+              <div class="settings-actions">
+                <button id="tool-append-result" class="header-button primary" type="button" data-i18n="button.appendToolResult" disabled>Send Tool Result to Model</button>
+              </div>
+              <div id="tool-status" class="tool-status">
+                Send a user request with tools enabled. When assistant.tool_calls appears, fill role=tool content here and continue.
+              </div>
+            </div>
+          </section>
+
           <form id="composer-form" class="composer">
             <textarea id="composer-input" placeholder=""></textarea>
             <div class="composer-footer">
@@ -1491,6 +1730,27 @@
                 <div class="field">
                   <label for="runtime-llm-model" data-i18n="label.model">Model</label>
                   <input id="runtime-llm-model" placeholder="deepseek-v4-flash">
+                </div>
+                <div class="field">
+                  <label for="tool-definition" data-i18n="label.toolDefinition">Tools / Tool Definition JSON</label>
+                  <textarea id="tool-definition">[
+  {
+    "type": "function",
+    "function": {
+      "name": "set_volume",
+      "description": "Set the output speaker volume.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "volume": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "unit": { "type": "string", "enum": ["percent"] }
+        },
+        "required": ["volume"]
+      }
+    }
+  }
+]</textarea>
+                  <div class="field-hint" data-i18n="hint.toolDefinition">This JSON is sent as the OpenAI-compatible tools array when you send a user message.</div>
                 </div>
                 <div class="settings-actions">
                   <button id="apply-runtime-config" class="header-button primary" type="button" data-i18n="button.applyConfig">Apply Config</button>
@@ -1543,6 +1803,32 @@
     </section>
   </main>
 
+  <div id="pending-tool-modal" class="modal-backdrop hidden" role="presentation">
+    <section class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="pending-tool-title" aria-describedby="pending-tool-copy">
+      <div class="modal-head">
+        <div>
+          <p class="modal-kicker" data-i18n="modal.pendingToolKicker">Tool result required</p>
+          <h2 id="pending-tool-title" class="modal-title" data-i18n="modal.pendingToolTitle">Pending tool call</h2>
+        </div>
+        <button id="pending-tool-close" class="header-button" type="button" data-i18n="button.close">Close</button>
+      </div>
+      <div class="modal-body">
+        <p id="pending-tool-copy" data-i18n="modal.pendingToolCopy">
+          The model has already returned tool_calls. Add the simulated tool result before sending another user message.
+        </p>
+        <div class="modal-kv">
+          <span data-i18n="label.toolName">Tool Name</span>
+          <strong id="pending-tool-name">-</strong>
+          <span data-i18n="label.toolCallId">tool_call_id</span>
+          <strong id="pending-tool-call-id">-</strong>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="pending-tool-focus" class="header-button primary" type="button" data-i18n="button.fillToolResult">Fill Tool Result</button>
+      </div>
+    </section>
+  </div>
+
   <script>
     const state = {
       apiBase: window.location.origin,
@@ -1551,6 +1837,7 @@
       runtimeLlmBaseUrl: "",
       runtimeLlmApiKey: "",
       runtimeLlmModel: "",
+      toolDefinitionJson: "",
       context: null,
       lastLatencyMs: null,
       lastRoundtripMs: null,
@@ -1573,6 +1860,7 @@
       metricSignature: "",
       activeMetric: "tokens",
       chatSignature: "",
+      optimisticMessages: [],
       pendingScrollToLatest: false,
       chatScrollFrame: 0
     };
@@ -1612,6 +1900,12 @@
         "label.range": "Range",
         "label.samples": "Samples",
         "label.apiKey": "API Key",
+        "label.toolDefinition": "Tools / Tool Definition JSON",
+        "label.toolRole": "Message Role",
+        "label.toolName": "Tool Name",
+        "label.toolCallId": "tool_call_id",
+        "label.toolArguments": "Tool Arguments JSON",
+        "label.toolResult": "Tool Message Content",
         "label.currentSessions": "Current Sessions",
         "label.apiAddress": "API Base",
         "label.pollInterval": "Polling Interval",
@@ -1623,6 +1917,11 @@
         "button.copied": "Copied",
         "button.jumpLatest": "Jump To Latest",
         "button.send": "Send",
+        "button.toolSimulator": "Pending Tool Call",
+        "button.fillSample": "Sample",
+        "button.appendToolResult": "Send Tool Result to Model",
+        "button.fillToolResult": "Fill Tool Result",
+        "button.close": "Close",
         "button.resetLocal": "Reset Local View",
         "button.applyConfig": "Apply Config",
         "button.deleteSelected": "Delete Selected",
@@ -1630,6 +1929,7 @@
         "placeholder.composer": "Type a message...",
         "placeholder.currentSession": "Leave blank to use the current session",
         "placeholder.apiKey": "Enter API key for this conversation model",
+        "placeholder.toolResult": "The volume has been adjusted to 30.",
         "status.service": "Service",
         "status.compression": "Compression",
         "status.serviceHealthy": "Service healthy · {sessions} sessions",
@@ -1648,12 +1948,20 @@
         "note.deletingSession": "Deleting selected session...",
         "note.refreshingSessions": "Refreshing session list...",
         "note.refreshingContext": "Refreshing context...",
+        "note.appendingToolResult": "Sending tool result and asking the model to continue...",
         "note.updatingConfig": "Updating runtime config...",
         "hint.loadingRuntimeConfig": "",
         "hint.noApiKeyConfigured": "",
         "hint.apiKeyReady": "",
         "hint.loadingConfig": "Loading config...",
         "hint.sessionCache": "Selecting one syncs the Session ID above. Deleting it clears the in-memory session cache.",
+        "hint.toolDefinition": "This JSON is sent as the OpenAI-compatible tools array when you send a user message.",
+        "hint.toolSimulatorReady": "Send a user request with tools enabled. When assistant.tool_calls appears, fill role=tool content here and continue.",
+        "hint.toolCallPending": "Pending assistant.tool_calls[{index}]. Fill role=tool content, then send it to continue the assistant reply.",
+        "hint.noPendingToolCall": "No pending tool_call. Send a user message with tools enabled first.",
+        "hint.toolCallMissing": "The model replied directly without tool_calls. The assistant content has been appended in the chat log.",
+        "hint.toolResultAppended": "Tool result appended for {id}. Asking the model for final assistant content...",
+        "hint.toolComplete": "Final assistant content appended.",
         "hint.configLoaded": "{poll} ms polling · TTL {ttl} s · max {max} sessions",
         "caption.compressing": "Background compression is running, but you can keep chatting and the active context remains readable.",
         "caption.busy": "The demo is calling /demo/chat and the upstream model, then refreshing this session's messages and metrics.",
@@ -1666,6 +1974,11 @@
         "role.summary": "Context Summary",
         "role.user": "User",
         "role.assistant": "Assistant",
+        "role.tool": "Tool",
+        "loading.assistant": "Waiting for assistant",
+        "modal.pendingToolKicker": "Tool result required",
+        "modal.pendingToolTitle": "Pending tool call",
+        "modal.pendingToolCopy": "The model has already returned tool_calls. Add the simulated tool result before sending another user message.",
         "config.loading": "Loading...",
         "config.turns": "{value} turns",
         "config.timeoutRetries": "{seconds} s / {retries} retries",
@@ -1678,7 +1991,8 @@
         "option.on": "On",
         "option.off": "Off",
         "alert.copyFailed": "Copy failed",
-        "alert.bootFailed": "Demo console initialization failed: {message}"
+        "alert.bootFailed": "Demo console initialization failed: {message}",
+        "alert.pendingToolCall": "Pending tool_call needs a simulated result.\n\nTool: {name}\ntool_call_id: {id}\n\nFill Tool Message Content in the Pending Tool Call panel, then click Send Tool Result to Model before sending another user message."
       },
       "zh-CN": {
         "meta.title": "ctx-cache-compressor 演示台",
@@ -1714,6 +2028,12 @@
         "label.range": "范围",
         "label.samples": "采样",
         "label.apiKey": "API Key",
+        "label.toolDefinition": "工具定义 JSON",
+        "label.toolRole": "消息角色",
+        "label.toolName": "工具名",
+        "label.toolCallId": "tool_call_id",
+        "label.toolArguments": "工具参数 JSON",
+        "label.toolResult": "工具消息内容",
         "label.currentSessions": "当前会话列表",
         "label.apiAddress": "API 地址",
         "label.pollInterval": "轮询间隔",
@@ -1725,6 +2045,11 @@
         "button.copied": "已复制",
         "button.jumpLatest": "到底部",
         "button.send": "发送",
+        "button.toolSimulator": "待处理工具调用",
+        "button.fillSample": "样例",
+        "button.appendToolResult": "发送工具结果给模型",
+        "button.fillToolResult": "填写工具结果",
+        "button.close": "关闭",
         "button.resetLocal": "重置本地",
         "button.applyConfig": "应用配置",
         "button.deleteSelected": "删除选中会话",
@@ -1732,6 +2057,7 @@
         "placeholder.composer": "输入消息…",
         "placeholder.currentSession": "留空则使用当前会话",
         "placeholder.apiKey": "输入本次对话模型要使用的 API Key",
+        "placeholder.toolResult": "声音已经调整为30",
         "status.service": "服务",
         "status.compression": "压缩",
         "status.serviceHealthy": "服务正常 · {sessions} 个会话",
@@ -1750,12 +2076,20 @@
         "note.deletingSession": "正在删除选中会话…",
         "note.refreshingSessions": "正在刷新会话列表…",
         "note.refreshingContext": "正在刷新上下文…",
+        "note.appendingToolResult": "正在发送工具结果并让模型继续回复…",
         "note.updatingConfig": "正在更新运行配置…",
         "hint.loadingRuntimeConfig": "",
         "hint.noApiKeyConfigured": "",
         "hint.apiKeyReady": "",
         "hint.loadingConfig": "正在加载配置…",
         "hint.sessionCache": "选择后会同步到上方会话 ID；删除会清掉该 session 对应的内存缓存。",
+        "hint.toolDefinition": "发送用户消息时，这段 JSON 会作为 OpenAI 兼容的工具定义传给模型。",
+        "hint.toolSimulatorReady": "先启用工具定义发送用户消息。出现 assistant.tool_calls 后，在这里填写 role=tool 的内容并继续。",
+        "hint.toolCallPending": "当前有待处理的 assistant.tool_calls[{index}]。填写 role=tool 内容后发送，模型会继续生成最终助手回复。",
+        "hint.noPendingToolCall": "当前没有待处理的 tool_call。请先在启用工具定义的情况下发送用户消息。",
+        "hint.toolCallMissing": "模型这次直接回复了，没有返回 tool_calls。助手内容已经追加到对话里。",
+        "hint.toolResultAppended": "已为 {id} 追加工具结果，正在让模型生成最终助手回复…",
+        "hint.toolComplete": "最终助手内容已追加。",
         "hint.configLoaded": "{poll} ms 轮询 · TTL {ttl} 秒 · 最多 {max} 个会话",
         "caption.compressing": "后台正在压缩历史消息，但你仍然可以继续对话，当前上下文会保持可读。",
         "caption.busy": "正在调用 /demo/chat 和上游模型，返回后会刷新同一个会话里的消息与指标。",
@@ -1768,6 +2102,11 @@
         "role.summary": "上下文摘要",
         "role.user": "用户",
         "role.assistant": "助手",
+        "role.tool": "工具",
+        "loading.assistant": "等待助手回复",
+        "modal.pendingToolKicker": "需要工具执行结果",
+        "modal.pendingToolTitle": "待处理工具调用",
+        "modal.pendingToolCopy": "模型已经返回 tool_calls。继续发送新的用户消息前，请先补充模拟工具执行结果。",
         "config.loading": "加载中",
         "config.turns": "{value} 轮",
         "config.timeoutRetries": "{seconds} 秒 / {retries} 次",
@@ -1780,7 +2119,8 @@
         "option.on": "开启",
         "option.off": "关闭",
         "alert.copyFailed": "复制失败",
-        "alert.bootFailed": "演示台初始化失败：{message}"
+        "alert.bootFailed": "演示台初始化失败：{message}",
+        "alert.pendingToolCall": "当前有待处理的 tool_call，需要先模拟工具执行结果。\n\n工具：{name}\ntool_call_id：{id}\n\n请在待处理工具调用面板填写工具消息内容，然后点击「发送工具结果给模型」，再继续发送新的用户消息。"
       }
     };
 
@@ -1842,6 +2182,21 @@
       composerInput: document.getElementById("composer-input"),
       composerNote: document.getElementById("composer-note"),
       sendButton: document.getElementById("send-button"),
+      toolSimToggle: document.getElementById("tool-sim-toggle"),
+      toolSimBody: document.getElementById("tool-sim-body"),
+      toolDefinition: document.getElementById("tool-definition"),
+      toolRole: document.getElementById("tool-role"),
+      toolName: document.getElementById("tool-name"),
+      toolCallId: document.getElementById("tool-call-id"),
+      toolArguments: document.getElementById("tool-arguments"),
+      toolResult: document.getElementById("tool-result"),
+      toolAppendResult: document.getElementById("tool-append-result"),
+      toolStatus: document.getElementById("tool-status"),
+      pendingToolModal: document.getElementById("pending-tool-modal"),
+      pendingToolName: document.getElementById("pending-tool-name"),
+      pendingToolCallId: document.getElementById("pending-tool-call-id"),
+      pendingToolClose: document.getElementById("pending-tool-close"),
+      pendingToolFocus: document.getElementById("pending-tool-focus"),
       metricRoundtrip: document.getElementById("metric-roundtrip"),
       metricLatency: document.getElementById("metric-latency"),
       metricOverview: document.getElementById("metric-overview"),
@@ -1897,18 +2252,19 @@
       try {
         const raw = window.localStorage.getItem("ctx-cache-compressor.conversation-config");
         if (!raw) {
-          return { baseUrl: "", apiKey: "", model: "" };
+          return { baseUrl: "", apiKey: "", model: "", tools: "" };
         }
 
         const parsed = JSON.parse(raw);
         return {
           baseUrl: typeof parsed.baseUrl === "string" ? parsed.baseUrl : "",
           apiKey: typeof parsed.apiKey === "string" ? parsed.apiKey : "",
-          model: typeof parsed.model === "string" ? parsed.model : ""
+          model: typeof parsed.model === "string" ? parsed.model : "",
+          tools: typeof parsed.tools === "string" ? parsed.tools : ""
         };
       } catch (error) {
         console.warn(error);
-        return { baseUrl: "", apiKey: "", model: "" };
+        return { baseUrl: "", apiKey: "", model: "", tools: "" };
       }
     }
 
@@ -1919,7 +2275,8 @@
           JSON.stringify({
             baseUrl: state.runtimeLlmBaseUrl || "",
             apiKey: state.runtimeLlmApiKey || "",
-            model: state.runtimeLlmModel || ""
+            model: state.runtimeLlmModel || "",
+            tools: state.toolDefinitionJson || ""
           })
         );
       } catch (error) {
@@ -1955,6 +2312,7 @@
     }
 
     function setLocale(nextLocale) {
+      const shouldRefreshToolStatus = isDefaultToolStatus();
       state.locale = normalizeLocale(nextLocale);
       try {
         window.localStorage.setItem("ctx-cache-compressor.locale", state.locale);
@@ -1962,6 +2320,9 @@
         console.warn(error);
       }
       renderAll();
+      if (shouldRefreshToolStatus) {
+        setToolStatus(t("hint.toolSimulatorReady"));
+      }
     }
 
     function copyButtonText() {
@@ -2065,6 +2426,54 @@
       return "";
     }
 
+    function formatToolCall(toolCall) {
+      if (!toolCall) return "";
+      const fn = toolCall.function || {};
+      const name = fn.name || toolCall.name || "tool";
+      const args = fn.arguments || "{}";
+      return [
+        `id: ${toolCall.id || "-"}`,
+        `type: ${toolCall.type || "function"}`,
+        `function.name: ${name}`,
+        `function.arguments: ${args}`
+      ].join("\n");
+    }
+
+    function messageDisplayText(message) {
+      if (message && message.loading) {
+        return t("loading.assistant");
+      }
+
+      const parts = [];
+      const text = messageText(message);
+      if (message && message.role === "tool") {
+        const meta = [
+          `tool_call_id: ${message.tool_call_id || "-"}`,
+          `name: ${message.name || "-"}`
+        ];
+        if (text.trim()) {
+          meta.push(`content: ${text}`);
+        }
+        return meta.join("\n");
+      }
+
+      if (text.trim()) {
+        parts.push(text);
+      }
+
+      if (message && Array.isArray(message.tool_calls) && message.tool_calls.length > 0) {
+        const calls = message.tool_calls
+          .map(formatToolCall)
+          .filter(Boolean)
+          .map((call, idx) => `tool_calls[${idx}]\n${call}`);
+        if (calls.length > 0) {
+          parts.push(calls.join("\n\n"));
+        }
+      }
+
+      return parts.join("\n\n");
+    }
+
     function isChatNearBottom() {
       const node = els.chatLog;
       if (!node) return true;
@@ -2101,6 +2510,9 @@
       els.runtimeLlmBase.value = state.runtimeLlmBaseUrl;
       els.runtimeLlmApiKey.value = state.runtimeLlmApiKey;
       els.runtimeLlmModel.value = state.runtimeLlmModel;
+      if (state.toolDefinitionJson) {
+        els.toolDefinition.value = state.toolDefinitionJson;
+      }
       els.pollInterval.value = String(state.pollIntervalMs);
       els.autoRefresh.value = state.autoRefresh ? "on" : "off";
     }
@@ -2111,6 +2523,7 @@
       els.createSession.disabled = isBusy;
       els.refreshContext.disabled = isBusy;
       els.resetLocal.disabled = isBusy;
+      els.toolSimToggle.disabled = isBusy;
       els.copySessionId.disabled = isBusy || !state.sessionId;
       els.deleteSelectedSession.disabled = isBusy;
       els.refreshSessions.disabled = isBusy;
@@ -2216,9 +2629,19 @@
       });
     }
 
+    function visibleConversationMessages() {
+      const contextMessages = state.context && Array.isArray(state.context.messages)
+        ? state.context.messages
+        : [];
+      const optimisticMessages = Array.isArray(state.optimisticMessages)
+        ? state.optimisticMessages
+        : [];
+      return contextMessages.concat(optimisticMessages);
+    }
+
     function renderMessages() {
-      const context = state.context;
-      if (!context || !Array.isArray(context.messages) || context.messages.length === 0) {
+      const messages = visibleConversationMessages();
+      if (messages.length === 0) {
         const message = state.sessionId ? t("empty.sessionReady") : t("empty.noSession");
         els.chatLog.innerHTML = `<div class="empty-state">${message}</div>`;
         state.chatSignature = "";
@@ -2227,10 +2650,10 @@
       }
 
       const shouldStickToBottom = state.pendingScrollToLatest || isChatNearBottom();
-      const visibleMessages = context.messages.filter((message) => {
-        const text = messageText(message);
+      const visibleMessages = messages.filter((message) => {
+        const text = messageDisplayText(message);
         const isSummary = message.role === "system" && text.startsWith("[CONTEXT SUMMARY]");
-        const isChatMessage = (message.role === "user" || message.role === "assistant") && text.trim();
+        const isChatMessage = (message.role === "user" || message.role === "assistant" || message.role === "tool") && text.trim();
         return isSummary || isChatMessage;
       });
 
@@ -2243,22 +2666,35 @@
 
       const nextSignature = visibleMessages
         .map((message) => {
-          const text = messageText(message);
+          const text = messageDisplayText(message);
           const isSummary = message.role === "system" && text.startsWith("[CONTEXT SUMMARY]");
           return `${isSummary ? "summary" : message.role}:${text}`;
         })
         .join("\u241f");
 
       els.chatLog.innerHTML = visibleMessages.map((message) => {
-        const text = messageText(message);
+        const text = messageDisplayText(message);
         const isSummary = message.role === "system" && text.startsWith("[CONTEXT SUMMARY]");
         const role = isSummary ? "summary" : message.role;
-        const label = isSummary ? t("role.summary") : role === "user" ? t("role.user") : t("role.assistant");
+        const hasToolCalls = Array.isArray(message.tool_calls) && message.tool_calls.length > 0;
+        const label = isSummary
+          ? t("role.summary")
+          : role === "user"
+            ? t("role.user")
+            : role === "tool"
+              ? t("role.tool")
+              : hasToolCalls
+                ? `${t("role.assistant")} · tool_calls`
+                : t("role.assistant");
+        const body = message.loading
+          ? `<span class="typing-indicator">${escapeHtml(text)}<span class="typing-dots" aria-hidden="true"><span></span><span></span><span></span></span></span>`
+          : escapeHtml(text || "(空内容)");
+        const className = `message ${role}${message.loading ? " loading" : ""}`;
 
         return `
-          <article class="message ${role}">
+          <article class="${className}">
             <div class="message-meta">${escapeHtml(label)}</div>
-            <div class="message-body">${escapeHtml(text || "(空内容)")}</div>
+            <div class="message-body">${body}</div>
           </article>
         `;
       }).join("");
@@ -2431,6 +2867,7 @@
       renderConfig();
       renderSessionList();
       renderMessages();
+      renderToolPanel();
       renderMetrics();
       renderChart();
     }
@@ -2506,6 +2943,231 @@
       await refreshContext();
     }
 
+    async function ensureSession() {
+      const existingId = els.sessionId.value.trim() || state.sessionId;
+      if (existingId) {
+        state.sessionId = existingId;
+        state.selectedSessionId = existingId;
+        return existingId;
+      }
+
+      await createSession();
+      return state.sessionId;
+    }
+
+    async function appendCoreMessage(sessionId, payload) {
+      return apiFetch(`/sessions/${encodeURIComponent(sessionId)}/messages`, {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+    }
+
+    function isDefaultToolStatus() {
+      if (!els.toolStatus) return false;
+      const current = els.toolStatus.textContent.trim();
+      return current === localeCopy.en["hint.toolSimulatorReady"]
+        || current === localeCopy["zh-CN"]["hint.toolSimulatorReady"];
+    }
+
+    function setToolStatus(message, kind = "") {
+      if (!els.toolStatus) return;
+      els.toolStatus.textContent = message || t("hint.toolSimulatorReady");
+      els.toolStatus.className = `tool-status ${kind}`.trim();
+    }
+
+    function parseToolDefinitions(rawText) {
+      const text = rawText.trim();
+      if (!text) {
+        return [];
+      }
+
+      let parsed;
+      try {
+        parsed = JSON.parse(text);
+      } catch (error) {
+        throw new Error(`Tool definition JSON must be valid JSON: ${error.message}`);
+      }
+
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+      if (Array.isArray(parsed.tools)) {
+        return parsed.tools;
+      }
+      if (parsed.type === "function" && parsed.function) {
+        return [parsed];
+      }
+      if (parsed.name || parsed.description || parsed.parameters) {
+        return [{ type: "function", function: parsed }];
+      }
+
+      throw new Error("Tool definition JSON must be a tools array, a { tools: [...] } object, or one function definition.");
+    }
+
+    function latestToolCallFromContext() {
+      const messages = state.context && Array.isArray(state.context.messages) ? state.context.messages : [];
+      const resolved = new Set(messages
+        .filter((message) => message && message.role === "tool" && message.tool_call_id)
+        .map((message) => message.tool_call_id));
+      for (let idx = messages.length - 1; idx >= 0; idx -= 1) {
+        const message = messages[idx];
+        if (message && Array.isArray(message.tool_calls) && message.tool_calls.length > 0) {
+          const pendingCall = message.tool_calls.find((call) => call && call.id && !resolved.has(call.id));
+          if (pendingCall) {
+            return pendingCall;
+          }
+        }
+      }
+      return null;
+    }
+
+    function syncToolFieldsFromLatestCall() {
+      const call = latestToolCallFromContext();
+      if (!call) {
+        els.toolCallId.value = "";
+        els.toolName.value = "";
+        els.toolArguments.value = "";
+        if (els.toolRole) {
+          els.toolRole.value = "tool";
+        }
+        return null;
+      }
+
+      const fn = call.function || {};
+      els.toolCallId.value = call.id || "";
+      els.toolName.value = fn.name || "";
+      if (fn.arguments) {
+        try {
+          els.toolArguments.value = JSON.stringify(JSON.parse(fn.arguments), null, 2);
+        } catch (_) {
+          els.toolArguments.value = fn.arguments;
+        }
+      } else {
+        els.toolArguments.value = "";
+      }
+      if (els.toolRole) {
+        els.toolRole.value = "tool";
+      }
+      return call;
+    }
+
+    function isPendingToolCallError(message) {
+      const text = String(message || "");
+      return text.includes("pending tool_call")
+        || text.includes("tool_calls must be followed by tool messages")
+        || text.includes("insufficient tool messages following tool_calls message");
+    }
+
+    function showPendingToolCallDialog(call = latestToolCallFromContext()) {
+      const pendingCall = call || syncToolFieldsFromLatestCall();
+      const fn = pendingCall && pendingCall.function ? pendingCall.function : {};
+      const id = pendingCall && pendingCall.id ? pendingCall.id : els.toolCallId.value || "-";
+      const name = fn.name || els.toolName.value || "tool";
+
+      syncToolFieldsFromLatestCall();
+      els.toolSimBody.classList.remove("hidden");
+      setToolStatus(t("hint.toolCallPending", { index: 0 }), "error");
+      els.pendingToolName.textContent = name;
+      els.pendingToolCallId.textContent = id;
+      els.pendingToolModal.classList.remove("hidden");
+      window.setTimeout(() => {
+        els.pendingToolFocus.focus();
+      }, 0);
+    }
+
+    function closePendingToolDialog(focusToolResult = false) {
+      els.pendingToolModal.classList.add("hidden");
+      if (focusToolResult) {
+        els.toolSimBody.classList.remove("hidden");
+        window.setTimeout(() => {
+          els.toolResult.focus();
+        }, 0);
+      }
+    }
+
+    function renderToolPanel() {
+      const call = syncToolFieldsFromLatestCall();
+      els.toolAppendResult.disabled = state.isSending || !call;
+      return call;
+    }
+
+    function showChatLoading(userMessage) {
+      state.optimisticMessages = [
+        {
+          role: "user",
+          content: userMessage
+        },
+        {
+          role: "assistant",
+          content: "",
+          loading: true
+        }
+      ];
+      state.pendingScrollToLatest = true;
+    }
+
+    function clearChatLoading() {
+      state.optimisticMessages = [];
+    }
+
+    async function appendManualToolResult() {
+      state.apiBase = els.apiBase.value.trim() || window.location.origin;
+      state.pollIntervalMs = Number(els.pollInterval.value) || 1200;
+      state.autoRefresh = els.autoRefresh.value === "on";
+
+      const sessionId = await ensureSession();
+      const toolName = els.toolName.value.trim();
+      const callId = els.toolCallId.value.trim();
+      const result = els.toolResult.value.trim();
+
+      if (!toolName) {
+        throw new Error("Tool name cannot be empty");
+      }
+      if (!callId) {
+        throw new Error("tool_call_id cannot be empty");
+      }
+      if (!result) {
+        throw new Error("Tool result cannot be empty");
+      }
+
+      await appendCoreMessage(sessionId, {
+        role: "tool",
+        content: result,
+        tool_call_id: callId,
+        name: toolName
+      });
+
+      state.sessionId = sessionId;
+      state.selectedSessionId = sessionId;
+      state.pendingScrollToLatest = true;
+      setToolStatus(t("hint.toolResultAppended", { id: callId }), "ok");
+      await loadSessions();
+      await refreshContext();
+    }
+
+    async function completeFromToolTranscript() {
+      state.apiBase = els.apiBase.value.trim() || window.location.origin;
+      state.pollIntervalMs = Number(els.pollInterval.value) || 1200;
+      state.autoRefresh = els.autoRefresh.value === "on";
+
+      const sessionId = await ensureSession();
+      const response = await apiFetch("/demo/complete", {
+        method: "POST",
+        body: JSON.stringify({ session_id: sessionId })
+      });
+
+      state.sessionId = response.session_id;
+      state.selectedSessionId = response.session_id;
+      state.context = response.context;
+      state.lastLatencyMs = response.completion_latency_ms;
+      state.lastDemo = response;
+      state.pendingScrollToLatest = true;
+      setToolStatus(t("hint.toolComplete"), "ok");
+      recordMetricSample();
+      await loadSessions();
+      renderAll();
+    }
+
     async function deleteSession(candidateId = "") {
       candidateId = candidateId.trim() || els.sessionId.value.trim() || state.selectedSessionId || state.sessionId;
       if (!candidateId) return;
@@ -2541,6 +3203,7 @@
 
       try {
         state.context = await apiFetch(`/sessions/${encodeURIComponent(candidateId)}/context`);
+        syncToolFieldsFromLatestCall();
         recordMetricSample();
       } catch (error) {
         console.error(error);
@@ -2574,35 +3237,75 @@
       const userMessage = els.composerInput.value.trim();
       if (!userMessage || state.isSending) return;
       const originalDraft = els.composerInput.value;
+      const pendingCall = latestToolCallFromContext();
+      if (pendingCall) {
+        showPendingToolCallDialog(pendingCall);
+        return;
+      }
 
       state.apiBase = els.apiBase.value.trim() || window.location.origin;
       state.pollIntervalMs = Number(els.pollInterval.value) || 1200;
       state.autoRefresh = els.autoRefresh.value === "on";
 
       els.composerInput.value = "";
+      showChatLoading(userMessage);
       setBusy(true);
       try {
-        const response = await apiFetch("/demo/chat", {
+        const tools = parseToolDefinitions(els.toolDefinition.value);
+        const path = tools.length > 0 ? "/demo/tool-call" : "/demo/chat";
+        const body = {
+          session_id: els.sessionId.value.trim() || null,
+          user_message: userMessage
+        };
+        if (tools.length > 0) {
+          body.tools = tools;
+        }
+
+        const response = await apiFetch(path, {
           method: "POST",
-          body: JSON.stringify({
-            session_id: els.sessionId.value.trim() || null,
-            user_message: userMessage
-          })
+          body: JSON.stringify(body)
         });
 
         state.sessionId = response.session_id;
         state.selectedSessionId = response.session_id;
+        clearChatLoading();
         state.context = response.context;
-        state.lastLatencyMs = response.completion_latency_ms;
+        state.lastLatencyMs = response.completion_latency_ms || null;
         state.lastDemo = response;
+        const pendingCall = syncToolFieldsFromLatestCall();
+        if (tools.length > 0) {
+          if (pendingCall) {
+            const messages = state.context && Array.isArray(state.context.messages) ? state.context.messages : [];
+            let index = 0;
+            for (let idx = messages.length - 1; idx >= 0; idx -= 1) {
+              const message = messages[idx];
+              if (message && Array.isArray(message.tool_calls)) {
+                const found = message.tool_calls.indexOf(pendingCall);
+                if (found >= 0) {
+                  index = found;
+                  break;
+                }
+              }
+            }
+            setToolStatus(t("hint.toolCallPending", { index: Math.max(index, 0) }), "ok");
+          } else {
+            setToolStatus(t("hint.toolCallMissing"), "ok");
+          }
+        }
         recordMetricSample();
         await loadSessions();
         state.pendingScrollToLatest = true;
         renderAll();
       } catch (error) {
+        clearChatLoading();
         els.composerInput.value = originalDraft;
         console.error(error);
-        alert(error.message);
+        setToolStatus(error.message, "error");
+        if (isPendingToolCallError(error.message)) {
+          showPendingToolCallDialog();
+        } else {
+          alert(error.message);
+        }
       } finally {
         setBusy(false);
       }
@@ -2617,8 +3320,14 @@
       state.metricSignature = "";
       state.copySessionStatus = "idle";
       state.chatSignature = "";
+      state.optimisticMessages = [];
       state.pendingScrollToLatest = false;
       els.composerInput.value = "";
+      els.toolCallId.value = "";
+      els.toolName.value = "";
+      els.toolArguments.value = "";
+      els.toolResult.value = "";
+      setToolStatus(t("hint.toolSimulatorReady"));
       renderAll();
     }
 
@@ -2660,6 +3369,11 @@
 
     els.runtimeLlmModel.addEventListener("input", () => {
       state.runtimeLlmModel = els.runtimeLlmModel.value;
+      persistConversationConfig();
+    });
+
+    els.toolDefinition.addEventListener("input", () => {
+      state.toolDefinitionJson = els.toolDefinition.value;
       persistConversationConfig();
     });
 
@@ -2743,6 +3457,50 @@
       schedulePolling();
     });
 
+    els.toolSimToggle.addEventListener("click", () => {
+      els.toolSimBody.classList.toggle("hidden");
+    });
+
+    els.pendingToolClose.addEventListener("click", () => {
+      closePendingToolDialog(false);
+    });
+
+    els.pendingToolFocus.addEventListener("click", () => {
+      closePendingToolDialog(true);
+    });
+
+    els.pendingToolModal.addEventListener("click", (event) => {
+      if (event.target === els.pendingToolModal) {
+        closePendingToolDialog(false);
+      }
+    });
+
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !els.pendingToolModal.classList.contains("hidden")) {
+        closePendingToolDialog(false);
+      }
+    });
+
+    els.toolAppendResult.addEventListener("click", async () => {
+      if (!latestToolCallFromContext()) {
+        setToolStatus(t("hint.noPendingToolCall"), "error");
+        renderToolPanel();
+        return;
+      }
+      setBusy(true, t("note.appendingToolResult"));
+      try {
+        await appendManualToolResult();
+        await completeFromToolTranscript();
+      } catch (error) {
+        console.error(error);
+        setToolStatus(error.message, "error");
+        alert(error.message);
+      } finally {
+        setBusy(false);
+        schedulePolling();
+      }
+    });
+
     els.jumpLatest.addEventListener("click", jumpToLatest);
 
     els.localeEn.addEventListener("click", () => {
@@ -2805,8 +3563,10 @@
       state.runtimeLlmBaseUrl = storedConversationConfig.baseUrl;
       state.runtimeLlmApiKey = storedConversationConfig.apiKey;
       state.runtimeLlmModel = storedConversationConfig.model;
+      state.toolDefinitionJson = storedConversationConfig.tools || "";
       state.apiBase = window.location.origin;
       syncInputsFromState();
+      setToolStatus(t("hint.toolSimulatorReady"));
       await Promise.all([loadHealth(), loadDemoConfig(), loadSessions()]);
       schedulePolling();
       window.setInterval(loadHealth, 5000);

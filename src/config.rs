@@ -17,6 +17,8 @@ pub struct ServerConfig {
     pub max_sessions: usize,
     pub session_ttl_seconds: u64,
     pub session_cleanup_interval_seconds: u64,
+    pub enable_demo_routes: bool,
+    pub permissive_cors: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -99,6 +101,8 @@ impl AppConfig {
             .set_default("server.max_sessions", 10_000)?
             .set_default("server.session_ttl_seconds", 3600)?
             .set_default("server.session_cleanup_interval_seconds", 60)?
+            .set_default("server.enable_demo_routes", true)?
+            .set_default("server.permissive_cors", true)?
             .set_default("compression.every_n_turns", 5)?
             .set_default("compression.keep_recent_turns", 2)?
             .set_default("compression.llm_timeout_seconds", 30)?

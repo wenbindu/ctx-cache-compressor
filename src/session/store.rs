@@ -1,4 +1,10 @@
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 
 use chrono::Utc;
 use dashmap::{mapref::entry::Entry, DashMap};
@@ -16,6 +22,7 @@ pub struct SessionStore {
     pub sessions: DashMap<String, Arc<RwLock<Session>>>,
     max_sessions: usize,
     ttl_seconds: u64,
+    active_sessions: AtomicUsize,
 }
 
 impl SessionStore {
@@ -24,6 +31,7 @@ impl SessionStore {
             sessions: DashMap::new(),
             max_sessions,
             ttl_seconds,
+            active_sessions: AtomicUsize::new(0),
         }
     }
 
@@ -33,19 +41,24 @@ impl SessionStore {
         every_n_turns: u32,
         system_prompt: Option<String>,
     ) -> AppResult<(String, Arc<RwLock<Session>>)> {
-        if self.sessions.len() >= self.max_sessions {
-            return Err(AppError::TooManySessions);
+        loop {
+            self.try_reserve_slot()?;
+
+            let session_id = Uuid::new_v4().to_string();
+            let session = Arc::new(RwLock::new(Session::new(
+                session_id.clone(),
+                every_n_turns.max(1),
+                system_prompt.clone(),
+            )));
+
+            match self.sessions.entry(session_id.clone()) {
+                Entry::Occupied(_) => self.release_slot(),
+                Entry::Vacant(entry) => {
+                    entry.insert(session.clone());
+                    return Ok((session_id, session));
+                }
+            }
         }
-
-        let session_id = Uuid::new_v4().to_string();
-        let session = Arc::new(RwLock::new(Session::new(
-            session_id.clone(),
-            every_n_turns.max(1),
-            system_prompt,
-        )));
-        self.sessions.insert(session_id.clone(), session.clone());
-
-        Ok((session_id, session))
     }
 
     #[instrument(skip(self))]
@@ -65,9 +78,7 @@ impl SessionStore {
             return Ok(existing.value().clone());
         }
 
-        if self.sessions.len() >= self.max_sessions {
-            return Err(AppError::TooManySessions);
-        }
+        self.try_reserve_slot()?;
 
         let candidate = Arc::new(RwLock::new(Session::new(
             session_id.to_string(),
@@ -76,7 +87,10 @@ impl SessionStore {
         )));
 
         match self.sessions.entry(session_id.to_string()) {
-            Entry::Occupied(entry) => Ok(entry.get().clone()),
+            Entry::Occupied(entry) => {
+                self.release_slot();
+                Ok(entry.get().clone())
+            }
             Entry::Vacant(entry) => {
                 entry.insert(candidate.clone());
                 Ok(candidate)
@@ -86,11 +100,53 @@ impl SessionStore {
 
     #[instrument(skip(self))]
     pub fn delete(&self, session_id: &str) -> bool {
-        self.sessions.remove(session_id).is_some()
+        let removed = self.sessions.remove(session_id).is_some();
+        if removed {
+            self.release_slot();
+        }
+        removed
     }
 
     pub fn len(&self) -> usize {
         self.sessions.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.sessions.is_empty()
+    }
+
+    fn try_reserve_slot(&self) -> AppResult<()> {
+        let mut current = self.active_sessions.load(Ordering::Acquire);
+        loop {
+            if current >= self.max_sessions {
+                return Err(AppError::TooManySessions);
+            }
+
+            match self.active_sessions.compare_exchange(
+                current,
+                current + 1,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            ) {
+                Ok(_) => return Ok(()),
+                Err(next) => current = next,
+            }
+        }
+    }
+
+    fn release_slot(&self) {
+        let mut current = self.active_sessions.load(Ordering::Acquire);
+        while current > 0 {
+            match self.active_sessions.compare_exchange(
+                current,
+                current - 1,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            ) {
+                Ok(_) => return,
+                Err(next) => current = next,
+            }
+        }
     }
 
     pub fn spawn_ttl_cleanup(self: Arc<Self>) {
@@ -124,7 +180,9 @@ impl SessionStore {
                 }
 
                 for session_id in expired {
-                    self.sessions.remove(&session_id);
+                    if self.sessions.remove(&session_id).is_some() {
+                        self.release_slot();
+                    }
                 }
             }
         });

@@ -97,12 +97,18 @@
 - `GET /demo/config`
 - `PATCH /demo/config`
 - `POST /demo/chat`
+- `POST /demo/tool-call`
+- `POST /demo/complete`
 
 ### UI 页面
 
 - `/compressor`
 - `/ex/dashboard`
 - `/ex/playground`
+
+Demo 与 UI 路由由 `server.enable_demo_routes` 控制。生产配置通常应关闭这些路由，只暴露核心 API。
+`/demo/tool-call` 接收 OpenAI 兼容的 `tools` 数组，用于 playground tool 模拟。
+`/demo/complete` 在手动追加 tool 结果后继续生成最终 assistant 回复。
 
 ## 5. 推荐理解方式
 

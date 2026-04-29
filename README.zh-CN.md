@@ -91,6 +91,14 @@ curl -sS http://127.0.0.1:8080/health | jq .
 http://127.0.0.1:8080/compressor
 ```
 
+生产环境如果只暴露核心 API，建议在配置里关闭本地演示页面和宽松 CORS：
+
+```toml
+[server]
+enable_demo_routes = false
+permissive_cors = false
+```
+
 ## 核心路由
 
 - `POST /sessions`
@@ -105,12 +113,20 @@ Demo 辅助接口：
 - `GET /demo/config`
 - `PATCH /demo/config`
 - `POST /demo/chat`
+- `POST /demo/tool-call`
+- `POST /demo/complete`
 
 UI 页面：
 
 - `/compressor`
 - `/ex/dashboard`
 - `/ex/playground`
+
+Demo 和 UI 路由仅在 `server.enable_demo_routes = true` 时启用。
+`/demo/tool-call` 接收 OpenAI 兼容的 `tools` 数组，让当前对话模型在普通 assistant
+回复和 `assistant(tool_calls)` 之间自行选择。手动补充对应 `tool` 结果后，
+`/demo/complete` 会继续生成最终 assistant 回复。如果上游模型返回供应商特定的
+`reasoning_content`，demo 会把它保存在 assistant 消息里，并在继续请求时原样传回。
 
 ## 推荐生产接入方式
 

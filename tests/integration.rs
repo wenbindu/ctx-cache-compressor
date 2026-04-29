@@ -1,13 +1,16 @@
 use std::{
     future::Future,
     pin::Pin,
-    sync::{atomic::Ordering, Arc},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     time::{Duration, Instant},
 };
 
 use axum::{
     body::Body,
-    http::{Method, Request, StatusCode},
+    http::{header::ACCESS_CONTROL_ALLOW_ORIGIN, HeaderMap, Method, Request, StatusCode},
     Router,
 };
 use ctx_cache_compressor::{
@@ -18,7 +21,10 @@ use ctx_cache_compressor::{
         TokenEstimationConfig,
     },
     error::{AppError, AppResult},
-    llm::client::{ChatLlm, CompressionLlm},
+    llm::{
+        client::{ChatLlm, CompressionLlm},
+        types::{ChatMessage, ChatMessageResponse, ToolSpec},
+    },
     runtime::DemoRuntimeConfig,
     session::{
         store::SessionStore,
@@ -33,6 +39,7 @@ use tower::ServiceExt;
 #[derive(Clone)]
 enum MockOutcome {
     Success(String),
+    ToolCalls(Vec<ToolCall>),
     Error(String),
 }
 
@@ -40,6 +47,11 @@ enum MockOutcome {
 struct MockLlm {
     delay: Duration,
     outcome: MockOutcome,
+}
+
+#[derive(Clone)]
+struct ReasoningToolLlm {
+    saw_reasoning_content: Arc<AtomicBool>,
 }
 
 impl CompressionLlm for MockLlm {
@@ -55,6 +67,9 @@ impl CompressionLlm for MockLlm {
 
             match &self.outcome {
                 MockOutcome::Success(text) => Ok(text.clone()),
+                MockOutcome::ToolCalls(_) => Err(AppError::Upstream(
+                    "mock outcome contains tool calls, not text".to_string(),
+                )),
                 MockOutcome::Error(err) => Err(AppError::Upstream(err.clone())),
             }
         })
@@ -65,16 +80,105 @@ impl ChatLlm for MockLlm {
     fn complete<'a>(
         &'a self,
         _messages: &'a [ctx_cache_compressor::llm::types::ChatMessage],
-    ) -> Pin<Box<dyn Future<Output = AppResult<String>> + Send + 'a>> {
+    ) -> Pin<Box<dyn Future<Output = AppResult<ChatMessageResponse>> + Send + 'a>> {
         Box::pin(async move {
             if !self.delay.is_zero() {
                 sleep(self.delay).await;
             }
 
             match &self.outcome {
-                MockOutcome::Success(text) => Ok(text.clone()),
+                MockOutcome::Success(text) => Ok(ChatMessageResponse {
+                    content: Some(text.clone()),
+                    reasoning_content: None,
+                    tool_calls: None,
+                }),
+                MockOutcome::ToolCalls(_) => Err(AppError::Upstream(
+                    "mock outcome contains tool calls, not text".to_string(),
+                )),
                 MockOutcome::Error(err) => Err(AppError::Upstream(err.clone())),
             }
+        })
+    }
+
+    fn complete_tool_call<'a>(
+        &'a self,
+        _messages: &'a [ctx_cache_compressor::llm::types::ChatMessage],
+        _tools: &'a [ToolSpec],
+    ) -> Pin<Box<dyn Future<Output = AppResult<ChatMessageResponse>> + Send + 'a>> {
+        Box::pin(async move {
+            if !self.delay.is_zero() {
+                sleep(self.delay).await;
+            }
+
+            match &self.outcome {
+                MockOutcome::Success(text) => Ok(ChatMessageResponse {
+                    content: Some(text.clone()),
+                    reasoning_content: None,
+                    tool_calls: None,
+                }),
+                MockOutcome::ToolCalls(calls) => Ok(ChatMessageResponse {
+                    content: None,
+                    reasoning_content: None,
+                    tool_calls: Some(calls.clone()),
+                }),
+                MockOutcome::Error(err) => Err(AppError::Upstream(err.clone())),
+            }
+        })
+    }
+}
+
+impl CompressionLlm for ReasoningToolLlm {
+    fn compress<'a>(
+        &'a self,
+        _system_prompt: &'a str,
+        _user_prompt: &'a str,
+    ) -> Pin<Box<dyn Future<Output = AppResult<String>> + Send + 'a>> {
+        Box::pin(async { Ok("summary".to_string()) })
+    }
+}
+
+impl ChatLlm for ReasoningToolLlm {
+    fn complete<'a>(
+        &'a self,
+        messages: &'a [ChatMessage],
+    ) -> Pin<Box<dyn Future<Output = AppResult<ChatMessageResponse>> + Send + 'a>> {
+        Box::pin(async move {
+            let saw_reasoning = messages.iter().any(|message| {
+                message.role == "assistant"
+                    && message
+                        .reasoning_content
+                        .as_deref()
+                        .is_some_and(|value| value == "reasoning required by provider")
+            });
+            self.saw_reasoning_content
+                .store(saw_reasoning, Ordering::SeqCst);
+
+            Ok(ChatMessageResponse {
+                content: Some("volume has been updated".to_string()),
+                reasoning_content: None,
+                tool_calls: None,
+            })
+        })
+    }
+
+    fn complete_tool_call<'a>(
+        &'a self,
+        _messages: &'a [ChatMessage],
+        _tools: &'a [ToolSpec],
+    ) -> Pin<Box<dyn Future<Output = AppResult<ChatMessageResponse>> + Send + 'a>> {
+        Box::pin(async {
+            Ok(ChatMessageResponse {
+                content: None,
+                reasoning_content: Some("reasoning required by provider".to_string()),
+                tool_calls: Some(vec![ToolCall {
+                    id: "call_reasoning_volume".to_string(),
+                    call_type: "function".to_string(),
+                    function: ToolFunction {
+                        name: "set_volume".to_string(),
+                        arguments: "{\"volume\":30,\"unit\":\"percent\"}".to_string(),
+                    },
+                }]),
+            })
         })
     }
 }
@@ -93,6 +197,8 @@ fn make_config(
             max_sessions: 20_000,
             session_ttl_seconds,
             session_cleanup_interval_seconds: 60,
+            enable_demo_routes: true,
+            permissive_cors: true,
         },
         compression: CompressionConfig {
             every_n_turns,
@@ -113,7 +219,26 @@ fn make_config(
     })
 }
 
-fn build_test_app(config: Arc<AppConfig>, llm: Arc<MockLlm>) -> (Router, Arc<SessionStore>) {
+fn make_config_with_server_flags(
+    enable_demo_routes: bool,
+    permissive_cors: bool,
+) -> Arc<AppConfig> {
+    let mut config = (*make_config(5, 2, 2, 0, 3600)).clone();
+    config.server.enable_demo_routes = enable_demo_routes;
+    config.server.permissive_cors = permissive_cors;
+    Arc::new(config)
+}
+
+fn make_config_with_max_sessions(max_sessions: usize) -> Arc<AppConfig> {
+    let mut config = (*make_config(5, 2, 2, 0, 3600)).clone();
+    config.server.max_sessions = max_sessions;
+    Arc::new(config)
+}
+
+fn build_test_app<L>(config: Arc<AppConfig>, llm: Arc<L>) -> (Router, Arc<SessionStore>)
+where
+    L: CompressionLlm + ChatLlm + 'static,
+{
     let runtime = Arc::new(RwLock::new(DemoRuntimeConfig::from_app_config(&config)));
     let store = Arc::new(SessionStore::new(
         config.server.max_sessions,
@@ -218,6 +343,40 @@ async fn call_text(app: &Router, method: Method, path: &str) -> (StatusCode, Str
     )
 }
 
+async fn call_text_with_origin(
+    app: &Router,
+    method: Method,
+    path: &str,
+    origin: &str,
+) -> (StatusCode, HeaderMap, String) {
+    let request = Request::builder()
+        .method(method)
+        .uri(path)
+        .header("origin", origin)
+        .body(Body::empty())
+        .expect("request should build");
+
+    let response = app
+        .clone()
+        .oneshot(request)
+        .await
+        .expect("request should execute");
+    let status = response.status();
+    let headers = response.headers().clone();
+    let bytes = response
+        .into_body()
+        .collect()
+        .await
+        .expect("body should read")
+        .to_bytes();
+
+    (
+        status,
+        headers,
+        String::from_utf8(bytes.to_vec()).expect("utf8 body expected"),
+    )
+}
+
 async fn create_session(app: &Router) -> String {
     let (status, body) = call_json(app, Method::POST, "/sessions", Some(json!({}))).await;
     assert_eq!(status, StatusCode::OK);
@@ -303,6 +462,31 @@ fn assistant_tool_call_payload(call_id: &str) -> Value {
                 "function": {
                     "name": "search",
                     "arguments": "{\"q\":\"rust axum\"}"
+                }
+            }
+        ]
+    })
+}
+
+fn assistant_duplicate_tool_call_payload() -> Value {
+    json!({
+        "role": "assistant",
+        "content": Value::Null,
+        "tool_calls": [
+            {
+                "id": "call_dup",
+                "type": "function",
+                "function": {
+                    "name": "search",
+                    "arguments": "{\"q\":\"rust\"}"
+                }
+            },
+            {
+                "id": "call_dup",
+                "type": "function",
+                "function": {
+                    "name": "lookup",
+                    "arguments": "{\"q\":\"axum\"}"
                 }
             }
         ]
@@ -445,6 +629,52 @@ async fn scenario_2_tool_chain_only_triggers_after_final_assistant() {
     let (status, body) = append_text(&app, &session_id, "assistant", "final answer").await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["compression_triggered"], true);
+}
+
+#[tokio::test]
+async fn scenario_tool_call_duplicate_ids_and_results_are_rejected() {
+    let config = make_config(5, 2, 2, 0, 3600);
+    let llm = Arc::new(MockLlm {
+        delay: Duration::ZERO,
+        outcome: MockOutcome::Success("summary".to_string()),
+    });
+    let (app, _store) = build_test_app(config, llm);
+
+    let duplicate_session_id = create_session(&app).await;
+    let (status, _) = append_text(&app, &duplicate_session_id, "user", "need tools").await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, body) = append_payload(
+        &app,
+        &duplicate_session_id,
+        assistant_duplicate_tool_call_payload(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(
+        body["error"]
+            .as_str()
+            .map(|text| text.contains("duplicate tool_call id"))
+            .unwrap_or(false),
+        "duplicate tool call ids should be rejected"
+    );
+
+    let session_id = create_session(&app).await;
+    let (status, _) = append_text(&app, &session_id, "user", "need search").await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _) =
+        append_payload(&app, &session_id, assistant_tool_call_payload("call_1")).await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _) = append_payload(&app, &session_id, tool_result_payload("call_1")).await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, body) = append_payload(&app, &session_id, tool_result_payload("call_1")).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(
+        body["error"]
+            .as_str()
+            .map(|text| text.contains("already resolved"))
+            .unwrap_or(false),
+        "duplicate tool result should be rejected"
+    );
 }
 
 #[tokio::test]
@@ -601,6 +831,38 @@ async fn scenario_7_ttl_expiration_removes_session_and_later_access_recreates_it
 }
 
 #[tokio::test]
+async fn scenario_fetch_context_refreshes_last_accessed() {
+    let config = make_config(100, 2, 2, 0, 3600);
+    let llm = Arc::new(MockLlm {
+        delay: Duration::ZERO,
+        outcome: MockOutcome::Success("unused".to_string()),
+    });
+    let (app, store) = build_test_app(config, llm);
+
+    let session_id = create_session(&app).await;
+    let before = {
+        let session = store.get(&session_id).expect("session should exist");
+        let guard = session.read().await;
+        guard.last_accessed
+    };
+
+    sleep(Duration::from_millis(10)).await;
+
+    let (status, _) = fetch_context(&app, &session_id).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let after = {
+        let session = store.get(&session_id).expect("session should exist");
+        let guard = session.read().await;
+        guard.last_accessed
+    };
+    assert!(
+        after > before,
+        "fetching context should refresh session last_accessed"
+    );
+}
+
+#[tokio::test]
 async fn scenario_8_tool_call_chain_crossing_stable_and_pending_boundary_is_valid() {
     let config = make_config(1, 0, 2, 0, 3600);
     let llm = Arc::new(MockLlm {
@@ -621,6 +883,7 @@ async fn scenario_8_tool_call_chain_crossing_stable_and_pending_boundary_is_vali
             Message {
                 role: Role::Assistant,
                 content: None,
+                reasoning_content: None,
                 tool_calls: Some(vec![ToolCall {
                     id: "call_1".to_string(),
                     call_type: "function".to_string(),
@@ -866,6 +1129,12 @@ async fn scenario_compressor_route_serves_chat_and_metrics_shell() {
     assert!(body.contains("Current Session"));
     assert!(body.contains("Session Cache"));
     assert!(body.contains("Create Session"));
+    assert!(body.contains("Tool Result"));
+    assert!(body.contains("Tools / Tool Definition JSON"));
+    assert!(body.contains("/demo/tool-call"));
+    assert!(body.contains("/demo/complete"));
+    assert!(body.contains("set_volume"));
+    assert!(!body.contains("Tool-Call Sample"));
     assert!(body.contains("EN"));
     assert!(body.contains("中文"));
     assert!(!body.contains("最近事件"));
@@ -897,6 +1166,33 @@ async fn scenario_removed_legacy_page_routes_return_not_found() {
     let (status, body) = call_text(&app, Method::GET, "/ctx-compressor-playground").await;
     assert_eq!(status, StatusCode::NOT_FOUND);
     assert!(body.is_empty());
+}
+
+#[tokio::test]
+async fn scenario_demo_routes_and_permissive_cors_can_be_disabled() {
+    let config = make_config_with_server_flags(false, false);
+    let llm = Arc::new(MockLlm {
+        delay: Duration::ZERO,
+        outcome: MockOutcome::Success("demo disabled".to_string()),
+    });
+    let (app, _store) = build_test_app(config, llm);
+
+    let (status, _) = call_json(&app, Method::GET, "/health", None).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, _) = call_text(&app, Method::GET, "/compressor").await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+
+    let (status, _) = call_text(&app, Method::POST, "/demo/chat").await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+
+    let (status, headers, _) =
+        call_text_with_origin(&app, Method::GET, "/health", "https://example.com").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        headers.get(ACCESS_CONTROL_ALLOW_ORIGIN).is_none(),
+        "disabled permissive CORS should not add access-control-allow-origin"
+    );
 }
 
 #[tokio::test]
@@ -957,6 +1253,364 @@ async fn scenario_demo_chat_returns_reply_and_trace_rich_context() {
             .iter()
             .any(|trace| trace["kind"] == "demo_chat_completed"),
         "demo chat completion trace should be present"
+    );
+}
+
+#[tokio::test]
+async fn scenario_demo_complete_continues_after_manual_tool_result() {
+    let config = make_config(2, 1, 2, 0, 3600);
+    let llm = Arc::new(MockLlm {
+        delay: Duration::from_millis(5),
+        outcome: MockOutcome::Success("volume has been updated".to_string()),
+    });
+    let (app, _store) = build_test_app(config, llm);
+
+    let session_id = create_session(&app).await;
+    let call_id = "call_set_volume_test";
+
+    let (status, _) = append_text(&app, &session_id, "user", "声音大一些").await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _) = call_json(
+        &app,
+        Method::POST,
+        &format!("/sessions/{session_id}/messages"),
+        Some(json!({
+            "role": "assistant",
+            "content": Value::Null,
+            "tool_calls": [{
+                "id": call_id,
+                "type": "function",
+                "function": {
+                    "name": "set_volume",
+                    "arguments": "{\"volume\":70,\"unit\":\"percent\"}"
+                }
+            }]
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _) = call_json(
+        &app,
+        Method::POST,
+        &format!("/sessions/{session_id}/messages"),
+        Some(json!({
+            "role": "tool",
+            "content": "{\"ok\":true,\"volume\":70}",
+            "tool_call_id": call_id,
+            "name": "set_volume"
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, body) = call_json(
+        &app,
+        Method::POST,
+        "/demo/complete",
+        Some(json!({ "session_id": session_id })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["assistant_message"], "volume has been updated");
+    assert_eq!(body["context"]["turn_count"], 1);
+
+    let messages = body["context"]["messages"]
+        .as_array()
+        .expect("messages should be array");
+    assert!(
+        messages
+            .iter()
+            .any(|message| message["role"] == "tool" && message["tool_call_id"] == call_id),
+        "tool result should remain visible in context"
+    );
+    assert!(
+        messages
+            .iter()
+            .any(|message| message["content"] == "volume has been updated"),
+        "final assistant message should be appended"
+    );
+}
+
+#[tokio::test]
+async fn scenario_demo_tool_call_uses_tool_definition_and_appends_assistant_call() {
+    let config = make_config(2, 1, 2, 0, 3600);
+    let llm = Arc::new(MockLlm {
+        delay: Duration::from_millis(5),
+        outcome: MockOutcome::ToolCalls(vec![ToolCall {
+            id: "call_set_volume_model".to_string(),
+            call_type: "function".to_string(),
+            function: ToolFunction {
+                name: "set_volume".to_string(),
+                arguments: "{\"volume\":70,\"unit\":\"percent\"}".to_string(),
+            },
+        }]),
+    });
+    let (app, _store) = build_test_app(config, llm);
+
+    let (status, body) = call_json(
+        &app,
+        Method::POST,
+        "/demo/tool-call",
+        Some(json!({
+            "user_message": "声音大一些",
+            "tools": [{
+                "type": "function",
+                "function": {
+                    "name": "set_volume",
+                    "description": "Set output speaker volume.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "volume": { "type": "integer" },
+                            "unit": { "type": "string" }
+                        },
+                        "required": ["volume"]
+                    }
+                }
+            }]
+        })),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["tool_call_count"], 1);
+    let messages = body["context"]["messages"]
+        .as_array()
+        .expect("messages should be array");
+    assert!(messages.iter().any(|message| message["role"] == "assistant"
+        && message["tool_calls"][0]["function"]["name"] == "set_volume"));
+}
+
+#[tokio::test]
+async fn scenario_demo_tool_call_allows_direct_assistant_response_without_tool_calls() {
+    let config = make_config(2, 1, 2, 0, 3600);
+    let llm = Arc::new(MockLlm {
+        delay: Duration::from_millis(5),
+        outcome: MockOutcome::Success("当前音量已经合适，不需要调用工具。".to_string()),
+    });
+    let (app, _store) = build_test_app(config, llm);
+
+    let (status, body) = call_json(
+        &app,
+        Method::POST,
+        "/demo/tool-call",
+        Some(json!({
+            "user_message": "声音不用调整，告诉我当前状态",
+            "tools": [{
+                "type": "function",
+                "function": {
+                    "name": "set_volume",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "volume": { "type": "integer" }
+                        },
+                        "required": ["volume"]
+                    }
+                }
+            }]
+        })),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["tool_call_count"], 0);
+    let messages = body["context"]["messages"]
+        .as_array()
+        .expect("messages should be array");
+    assert!(messages.iter().any(|message| message["role"] == "assistant"
+        && message["content"] == "当前音量已经合适，不需要调用工具。"
+        && message.get("tool_calls").is_none()));
+}
+
+#[tokio::test]
+async fn scenario_demo_tool_call_rejects_continuation_when_tool_result_is_pending() {
+    let config = make_config(2, 1, 2, 0, 3600);
+    let llm = Arc::new(MockLlm {
+        delay: Duration::ZERO,
+        outcome: MockOutcome::Error("llm should not be called".to_string()),
+    });
+    let (app, _store) = build_test_app(config, llm);
+
+    let session_id = create_session(&app).await;
+    let (status, _) = append_text(&app, &session_id, "user", "声音设置为30").await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _) = call_json(
+        &app,
+        Method::POST,
+        &format!("/sessions/{session_id}/messages"),
+        Some(json!({
+            "role": "assistant",
+            "tool_calls": [{
+                "id": "call_pending_volume",
+                "type": "function",
+                "function": {
+                    "name": "set_volume",
+                    "arguments": "{\"volume\":30}"
+                }
+            }]
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, body) = call_json(
+        &app,
+        Method::POST,
+        "/demo/tool-call",
+        Some(json!({
+            "session_id": session_id,
+            "user_message": "继续",
+            "tools": [{
+                "type": "function",
+                "function": {
+                    "name": "set_volume",
+                    "parameters": { "type": "object" }
+                }
+            }]
+        })),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert!(body["error"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("pending tool_call requires"));
+}
+
+#[tokio::test]
+async fn scenario_demo_tool_call_preserves_reasoning_content_for_completion() {
+    let config = make_config(2, 1, 2, 0, 3600);
+    let saw_reasoning_content = Arc::new(AtomicBool::new(false));
+    let llm = Arc::new(ReasoningToolLlm {
+        saw_reasoning_content: Arc::clone(&saw_reasoning_content),
+    });
+    let (app, _store) = build_test_app(config, llm);
+
+    let (status, body) = call_json(
+        &app,
+        Method::POST,
+        "/demo/tool-call",
+        Some(json!({
+            "user_message": "声音设置为30",
+            "tools": [{
+                "type": "function",
+                "function": {
+                    "name": "set_volume",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "volume": { "type": "integer" }
+                        },
+                        "required": ["volume"]
+                    }
+                }
+            }]
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let session_id = body["session_id"].as_str().expect("session id");
+    let messages = body["context"]["messages"]
+        .as_array()
+        .expect("messages should be array");
+    assert!(messages.iter().any(|message| message["role"] == "assistant"
+        && message["reasoning_content"] == "reasoning required by provider"));
+
+    let (status, _) = call_json(
+        &app,
+        Method::POST,
+        &format!("/sessions/{session_id}/messages"),
+        Some(json!({
+            "role": "tool",
+            "content": "声音已经调整为30",
+            "tool_call_id": "call_reasoning_volume",
+            "name": "set_volume"
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, body) = call_json(
+        &app,
+        Method::POST,
+        "/demo/complete",
+        Some(json!({ "session_id": session_id })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["assistant_message"], "volume has been updated");
+    assert!(saw_reasoning_content.load(Ordering::SeqCst));
+}
+
+#[tokio::test]
+async fn scenario_demo_tool_call_works_with_empty_existing_session() {
+    let config = make_config(2, 1, 2, 0, 3600);
+    let llm = Arc::new(MockLlm {
+        delay: Duration::ZERO,
+        outcome: MockOutcome::ToolCalls(vec![ToolCall {
+            id: "call_empty_session".to_string(),
+            call_type: "function".to_string(),
+            function: ToolFunction {
+                name: "set_volume".to_string(),
+                arguments: "{\"volume\":60}".to_string(),
+            },
+        }]),
+    });
+    let (app, _store) = build_test_app(config, llm);
+    let session_id = create_session(&app).await;
+
+    let (status, body) = call_json(
+        &app,
+        Method::POST,
+        "/demo/tool-call",
+        Some(json!({
+            "session_id": session_id,
+            "user_message": "声音大一些",
+            "tools": [{
+                "type": "function",
+                "function": {
+                    "name": "set_volume",
+                    "description": "Set output speaker volume.",
+                    "parameters": { "type": "object" }
+                }
+            }]
+        })),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["session_id"], session_id);
+    assert_eq!(body["tool_call_count"], 1);
+}
+
+#[tokio::test]
+async fn scenario_demo_chat_times_out_before_assistant_append() {
+    let config = make_config(2, 1, 1, 0, 3600);
+    let llm = Arc::new(MockLlm {
+        delay: Duration::from_millis(1500),
+        outcome: MockOutcome::Success("late demo reply".to_string()),
+    });
+    let (app, _store) = build_test_app(config, llm);
+
+    let (status, body) = call_json(
+        &app,
+        Method::POST,
+        "/demo/chat",
+        Some(json!({
+            "user_message": "this should time out"
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::GATEWAY_TIMEOUT);
+    assert!(
+        body["error"]
+            .as_str()
+            .map(|text| text.contains("demo chat timeout"))
+            .unwrap_or(false),
+        "timeout response should explain demo chat timeout"
     );
 }
 
@@ -1088,10 +1742,50 @@ async fn scenario_sessions_endpoint_lists_active_sessions() {
     );
 }
 
+#[tokio::test]
+async fn scenario_max_sessions_is_enforced_under_concurrent_creation() {
+    let config = make_config_with_max_sessions(1);
+    let llm = Arc::new(MockLlm {
+        delay: Duration::ZERO,
+        outcome: MockOutcome::Success("capacity test".to_string()),
+    });
+    let (app, store) = build_test_app(config, llm);
+
+    let mut tasks = JoinSet::new();
+    for _ in 0..20 {
+        let app_clone = app.clone();
+        tasks.spawn(async move {
+            let (status, _body) = call_json_owned(
+                app_clone,
+                Method::POST,
+                "/sessions".to_string(),
+                Some(json!({})),
+            )
+            .await;
+            status
+        });
+    }
+
+    let mut created = 0usize;
+    let mut rejected = 0usize;
+    while let Some(result) = tasks.join_next().await {
+        match result.expect("session creation task should complete") {
+            StatusCode::OK => created += 1,
+            StatusCode::SERVICE_UNAVAILABLE => rejected += 1,
+            status => panic!("unexpected session creation status: {status}"),
+        }
+    }
+
+    assert_eq!(created, 1);
+    assert_eq!(rejected, 19);
+    assert_eq!(store.len(), 1);
+}
+
 fn _tool_message(call_id: &str) -> Message {
     Message {
         role: Role::Tool,
         content: Some(MessageContent::Text("result".to_string())),
+        reasoning_content: None,
         tool_calls: None,
         tool_call_id: Some(call_id.to_string()),
         name: Some("search".to_string()),

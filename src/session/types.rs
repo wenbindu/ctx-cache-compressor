@@ -50,6 +50,8 @@ pub struct Message {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content: Option<MessageContent>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning_content: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<ToolCall>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_call_id: Option<String>,
@@ -62,6 +64,7 @@ impl Message {
         Self {
             role,
             content: Some(MessageContent::Text(content.into())),
+            reasoning_content: None,
             tool_calls: None,
             tool_call_id: None,
             name: None,
@@ -120,6 +123,10 @@ impl Message {
 
         if let Some(name) = self.name.as_ref() {
             total += name.chars().count();
+        }
+
+        if let Some(reasoning_content) = self.reasoning_content.as_ref() {
+            total += reasoning_content.chars().count();
         }
 
         total

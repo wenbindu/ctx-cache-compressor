@@ -12,6 +12,12 @@ max_sessions = 10000
 session_ttl_seconds = 3600
 # How often the TTL cleanup worker scans sessions.
 session_cleanup_interval_seconds = 60
+# Enable built-in demo/UI routes: /, /compressor, /ex/*, and /demo/*.
+# Keep this true for local demos; consider false for production core API deployments.
+enable_demo_routes = true
+# Add permissive CORS headers for browser-based local demos.
+# Consider false when serving only trusted backend callers.
+permissive_cors = true
 
 [compression]
 # Trigger compression every N completed turns.
