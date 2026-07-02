@@ -1579,6 +1579,10 @@
                     <strong id="metric-compressed">0</strong>
                   </div>
                   <div class="config-row">
+                    <span data-i18n="label.nextCompression">Next Compression</span>
+                    <strong id="metric-next-compression">-</strong>
+                  </div>
+                  <div class="config-row">
                     <span data-i18n="label.summaryCount">Summary Count</span>
                     <strong id="metric-summaries">0</strong>
                   </div>
@@ -1893,6 +1897,7 @@
         "label.modelLatency": "Model Latency",
         "label.messageCount": "Message Count",
         "label.compressedTurns": "Compressed Turns",
+        "label.nextCompression": "Next Compression",
         "label.summaryCount": "Summary Count",
         "label.stablePending": "Stable / Pending",
         "label.metric": "Metric",
@@ -1981,6 +1986,8 @@
         "modal.pendingToolCopy": "The model has already returned tool_calls. Add the simulated tool result before sending another user message.",
         "config.loading": "Loading...",
         "config.turns": "{value} turns",
+        "config.tokens": "{value} tokens",
+        "config.disabled": "Disabled",
         "config.timeoutRetries": "{seconds} s / {retries} retries",
         "chart.metric.tokens": "Tokens",
         "chart.metric.latency": "Latency",
@@ -2021,6 +2028,7 @@
         "label.modelLatency": "模型耗时",
         "label.messageCount": "消息数",
         "label.compressedTurns": "已压缩轮次",
+        "label.nextCompression": "下次压缩",
         "label.summaryCount": "摘要数",
         "label.stablePending": "Stable / Pending",
         "label.metric": "指标",
@@ -2109,6 +2117,8 @@
         "modal.pendingToolCopy": "模型已经返回 tool_calls。继续发送新的用户消息前，请先补充模拟工具执行结果。",
         "config.loading": "加载中",
         "config.turns": "{value} 轮",
+        "config.tokens": "{value} token",
+        "config.disabled": "关闭",
         "config.timeoutRetries": "{seconds} 秒 / {retries} 次",
         "chart.metric.tokens": "Token",
         "chart.metric.latency": "延迟",
@@ -2202,6 +2212,7 @@
       metricOverview: document.getElementById("metric-overview"),
       metricMessages: document.getElementById("metric-messages"),
       metricCompressed: document.getElementById("metric-compressed"),
+      metricNextCompression: document.getElementById("metric-next-compression"),
       metricBuffers: document.getElementById("metric-buffers"),
       metricSummaries: document.getElementById("metric-summaries"),
       cfgModel: document.getElementById("cfg-model"),
@@ -2713,6 +2724,9 @@
       els.metricOverview.textContent = context ? `${context.turn_count} / ${context.token_estimate}` : "0 / 0";
       els.metricMessages.textContent = context ? String(context.messages.length) : "0";
       els.metricCompressed.textContent = context ? String(context.compressed_turns) : "0";
+      els.metricNextCompression.textContent = context
+        ? `${context.next_compress_at} / ${context.turns_until_compression}`
+        : "-";
       els.metricBuffers.textContent = context ? `${context.stable_message_count} / ${context.pending_message_count}` : "0 / 0";
       els.metricSummaries.textContent = context ? String(context.summary_message_count) : "0";
     }

@@ -3,7 +3,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     llm::types::ToolSpec,
-    session::types::{Message, MessageContent, Role, SessionTraceEvent, ToolCall},
+    session::types::{
+        CompressionEvaluationSnapshot, Message, MessageContent, Role, SessionTraceEvent, ToolCall,
+    },
 };
 
 #[derive(Debug, Clone, Deserialize)]
@@ -75,11 +77,14 @@ pub struct FetchContextResponse {
     pub turn_count: u32,
     pub is_compressing: bool,
     pub compressed_turns: u32,
+    pub next_compress_at: u32,
+    pub turns_until_compression: u32,
     pub token_estimate: usize,
     pub stable_message_count: usize,
     pub pending_message_count: usize,
     pub summary_message_count: usize,
     pub latest_summary_preview: Option<String>,
+    pub last_compression_evaluation: Option<CompressionEvaluationSnapshot>,
     pub last_compression_triggered_at: Option<DateTime<Utc>>,
     pub last_compression_finished_at: Option<DateTime<Utc>>,
     pub traces: Vec<SessionTraceEvent>,

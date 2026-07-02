@@ -172,6 +172,10 @@ impl SessionStore {
                 let mut expired = Vec::new();
                 for (session_id, session) in snapshot {
                     let guard = session.read().await;
+                    if guard.is_compressing.load(Ordering::Relaxed) {
+                        continue;
+                    }
+
                     let idle_seconds = now.signed_duration_since(guard.last_accessed).num_seconds();
 
                     if idle_seconds >= ttl_seconds as i64 {

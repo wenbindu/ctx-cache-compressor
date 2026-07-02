@@ -12,8 +12,10 @@ max_sessions = 10000
 session_ttl_seconds = 3600
 # How often the TTL cleanup worker scans sessions.
 session_cleanup_interval_seconds = 60
-# Enable built-in demo/UI routes: /, /compressor, /ex/*, and /demo/*.
-# Keep this true for local demos; consider false for production core API deployments.
+# Enable built-in demo/UI routes for the compatibility binary:
+# /, /compressor, /ex/*, and /demo/*.
+# Production should usually run `ctx-cache-compressor-api`, which exposes only
+# core API routes regardless of this flag. Keep this true for local combined demos.
 enable_demo_routes = true
 # Add permissive CORS headers for browser-based local demos.
 # Consider false when serving only trusted backend callers.
@@ -39,12 +41,14 @@ system_instructions = '''
 要求：
 1. 保留关键决策、重要事实、用户意图和阶段性结论。
 2. 保留重要工具调用结果与关键观察。
-3. 去除寒暄、重复解释、过渡性话术。
-4. 用客观第三人称组织内容，结构为：
+3. 如果输入包含 [CONTEXT SUMMARY]，它代表既有摘要；请把它与新增对话合并为一份更新后的摘要，不要逐字复述旧摘要。
+4. 权重规则：新增对话高于既有摘要；最终用户意图高于中间讨论；工具结果高于工具调用参数；若新旧信息冲突，以新增对话为准。
+5. 去除寒暄、重复解释、过渡性话术。
+6. 用客观第三人称组织内容，结构为：
    [用户目标] -> [关键过程] -> [当前结论/状态]。
-5. 摘要长度控制在原文 20%-30%。
-6. 输出语言必须与原始对话主要语言一致：主要中文则输出中文，主要英文则输出英文。
-7. 仅输出摘要正文，不要附加前缀或解释。
+7. 摘要长度控制在原文 20%-30%。
+8. 输出语言必须与原始对话主要语言一致：主要中文则输出中文，主要英文则输出英文。
+9. 仅输出摘要正文，不要附加前缀或解释。
 '''
 # Variables: {turn_count}, {serialized_messages}
 user_prompt_template = '''

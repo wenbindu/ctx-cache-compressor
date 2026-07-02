@@ -11,7 +11,9 @@ use crate::{
         dto::{AppendMessageRequest, AppendMessageResponse},
         AppState,
     },
-    compression::trigger::should_trigger_compression,
+    compression::{
+        compressor::Compressor, scheduler::CompressionSnapshot, trigger::should_trigger_compression,
+    },
     error::AppResult,
     session::{
         turn::is_at_turn_boundary,
@@ -29,7 +31,7 @@ pub async fn append_message_to_session(
     let session = state
         .store
         .get_or_create_with_id(session_id, every_n_turns)?;
-    let mut snapshot_to_compress: Option<Vec<Message>> = None;
+    let mut snapshot_to_compress: Option<CompressionSnapshot> = None;
 
     let response = {
         let mut guard = session.write().await;
@@ -55,6 +57,7 @@ pub async fn append_message_to_session(
             guard.pending.push(incoming);
         } else {
             guard.stable.push(incoming);
+            guard.stable_revision = guard.stable_revision.saturating_add(1);
         }
         guard.push_trace(trace_kind, trace_message);
 
@@ -64,17 +67,18 @@ pub async fn append_message_to_session(
         if turn_completed {
             guard.turn_count = guard.turn_count.saturating_add(1);
         }
-
         let mut compression_triggered = false;
         if should_trigger_compression(
             turn_completed,
             at_turn_boundary,
             guard.turn_count,
             guard.next_compress_at,
-        ) && guard
-            .is_compressing
-            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-            .is_ok()
+        ) && Compressor::plan(&guard.stable, state.config.compression.keep_recent_turns)
+            .is_some()
+            && guard
+                .is_compressing
+                .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+                .is_ok()
         {
             compression_triggered = true;
             let trace_message = format!(
@@ -83,7 +87,10 @@ pub async fn append_message_to_session(
                 guard.stable.len()
             );
             guard.push_trace(SessionTraceKind::CompressionTriggered, trace_message);
-            snapshot_to_compress = Some(guard.stable.clone());
+            snapshot_to_compress = Some(CompressionSnapshot {
+                messages: guard.stable.clone(),
+                stable_revision: guard.stable_revision,
+            });
         }
 
         AppendMessageResponse {

@@ -384,7 +384,7 @@ pub async fn demo_tool_call(
     )
     .await;
 
-    let mut chat_messages = match demo_chat_messages(&state, &session_id).await {
+    let chat_messages = match demo_chat_messages(&state, &session_id).await {
         Ok(messages) => messages,
         Err(AppError::Conflict(_)) => Vec::new(),
         Err(err) => return Err(err),
@@ -397,14 +397,14 @@ pub async fn demo_tool_call(
         )));
     }
 
-    chat_messages.push(ChatMessage {
-        role: "user".to_string(),
-        content: Some(user_message.clone()),
-        reasoning_content: None,
-        tool_calls: None,
-        tool_call_id: None,
-        name: None,
-    });
+    let user_append = append_message_to_session(
+        &state,
+        &session_id,
+        Message::text(Role::User, user_message.clone()),
+    )
+    .await?;
+
+    let chat_messages = demo_chat_messages(&state, &session_id).await?;
     let timeout = Duration::from_secs(state.config.compression.llm_timeout_seconds);
     let assistant_message = match tokio::time::timeout(
         timeout,
@@ -446,13 +446,6 @@ pub async fn demo_tool_call(
         .as_ref()
         .map(Vec::len)
         .unwrap_or_default();
-
-    let user_append = append_message_to_session(
-        &state,
-        &session_id,
-        Message::text(Role::User, user_message.clone()),
-    )
-    .await?;
 
     let assistant_append = append_message_to_session(
         &state,
@@ -518,6 +511,7 @@ async fn sync_demo_session_system_prompt(
         }
         _ => guard.stable.insert(0, next_message),
     }
+    guard.stable_revision = guard.stable_revision.saturating_add(1);
 
     guard.push_trace(
         SessionTraceKind::SystemMessageAppended,

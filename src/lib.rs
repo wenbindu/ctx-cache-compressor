@@ -4,4 +4,5 @@ pub mod config;
 pub mod error;
 pub mod llm;
 pub mod runtime;
+pub mod service;
 pub mod session;

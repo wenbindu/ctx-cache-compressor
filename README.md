@@ -39,6 +39,10 @@ Invariant:
 
 `full context = stable + pending`
 
+`GET /sessions/{session_id}/context` always returns that full canonical context.
+After compression, older detailed turns are represented by a `[CONTEXT SUMMARY]`
+message, while recent turns and any in-flight messages remain detailed.
+
 That gives the service its main property:
 
 - `append` does not wait for compression
@@ -50,6 +54,11 @@ Compression only runs at completed turn boundaries:
 
 - simple turn: `user -> assistant`
 - tool turn: `user -> assistant(tool_calls) -> tool... -> assistant`
+
+Compression is intentionally turn-based, while still requiring a completed turn
+boundary:
+
+- `compression.every_n_turns`: compress after N completed turns
 
 ## Quick Start
 
@@ -79,6 +88,21 @@ Run locally:
 cargo run
 ```
 
+The default binary keeps the historical combined behavior: core API routes plus
+demo/UI routes when `server.enable_demo_routes = true`.
+
+You can also run the production API and demo surface as separate services:
+
+```bash
+cargo run --bin ctx-cache-compressor-api
+cargo run --bin ctx-cache-compressor-demo
+```
+
+`ctx-cache-compressor-api` exposes only the core API routes and is the preferred
+production entrypoint. `ctx-cache-compressor-demo` serves the playground and demo
+helpers for local inspection; the `/compressor` page also has an API Base field
+so it can point at a separately deployed API service.
+
 Health check:
 
 ```bash
@@ -91,12 +115,11 @@ Open the playground:
 http://127.0.0.1:8080/compressor
 ```
 
-For production core API deployments, disable local demo surfaces and permissive
-CORS in your config:
+For production core API deployments, prefer the API-only binary and disable
+permissive CORS unless browser callers need it:
 
 ```toml
 [server]
-enable_demo_routes = false
 permissive_cors = false
 ```
 
@@ -123,7 +146,9 @@ UI routes:
 - `/ex/dashboard`
 - `/ex/playground`
 
-The demo and UI routes are available only when `server.enable_demo_routes = true`.
+The compatibility binary exposes demo and UI routes only when
+`server.enable_demo_routes = true`. The API-only binary never exposes demo/UI
+routes. The demo binary is intended for local display and testing.
 `/demo/tool-call` accepts an OpenAI-compatible `tools` array and asks the
 configured conversation model to choose between a normal assistant reply and
 `assistant(tool_calls)`. `/demo/complete` continues after the matching `tool`
@@ -144,11 +169,13 @@ This service should sit between your application and the upstream model. It mana
 
 ## Deployment
 
-Build and run a release binary:
+Build and run the production API binary:
 
 ```bash
-cargo build --release
-CONFIG_FILE=deploy/config/prod.toml scripts/run_release.sh
+cargo build --release --locked --bin ctx-cache-compressor-api
+OPENAI_API_KEY=sk-... \
+CTX_CACHE_COMPRESSOR_CONFIG_FILE=deploy/config/prod.toml \
+target/release/ctx-cache-compressor-api
 ```
 
 Package a release archive for the current or specified target:
@@ -158,11 +185,32 @@ scripts/package_release.sh
 TARGET=x86_64-unknown-linux-gnu scripts/package_release.sh
 ```
 
-The archive name includes the Rust target triple, for example:
+By default the archive includes all three binaries. To publish a single
+production API binary package:
+
+```bash
+BINARIES=ctx-cache-compressor-api scripts/package_release.sh
+```
+
+The archive name includes the Rust target triple, because each platform needs a
+different binary:
 
 ```text
 ctx-cache-compressor-0.1.0-x86_64-unknown-linux-gnu.tar.gz
 ```
+
+For Linux, use the `x86_64-unknown-linux-musl` archive when you want the closest
+equivalent to a Go-style static binary. The project uses Rustls, so release
+binaries do not require OpenSSL to be installed separately.
+
+From an extracted package, run:
+
+```bash
+OPENAI_API_KEY=sk-... scripts/run_release.sh
+```
+
+`scripts/run_release.sh` defaults to `SERVICE=api`; use `SERVICE=demo` for the
+display service or `SERVICE=compat` for the combined compatibility service.
 
 Other deployment paths already included in the repo:
 
@@ -188,7 +236,9 @@ Recommended GitHub Releases strategy:
 
 For most teams, `Linux binary + Docker image + source tag` is enough.
 
-This repo includes a GitHub Actions workflow that builds and publishes an `x86_64-unknown-linux-gnu` release artifact when you push a tag such as `v0.1.0`.
+This repo includes a GitHub Actions workflow that builds and publishes Linux,
+macOS, and Windows release archives when you push a tag such as `v0.1.0`.
+See [Release Guide](./docs/release.md) for the full publishing checklist.
 
 ## Testing
 
@@ -209,4 +259,5 @@ scripts/smoke.sh
 
 - [Project Overview](./docs/project-overview.md)
 - [API & Observability Map](./docs/api-observability-map.md)
+- [Release Guide](./docs/release.md)
 - [Chinese README](./README.zh-CN.md)

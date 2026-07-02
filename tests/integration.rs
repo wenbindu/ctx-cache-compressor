@@ -14,7 +14,10 @@ use axum::{
     Router,
 };
 use ctx_cache_compressor::{
-    api::{routes::build_router, AppState},
+    api::{
+        routes::{build_api_router, build_demo_router, build_router},
+        AppState,
+    },
     compression::{compressor::Compressor, scheduler::CompressionScheduler},
     config::{
         AppConfig, CompressionConfig, CompressionPromptConfig, LlmConfig, ServerConfig,
@@ -28,7 +31,7 @@ use ctx_cache_compressor::{
     runtime::DemoRuntimeConfig,
     session::{
         store::SessionStore,
-        types::{Message, MessageContent, Role, ToolCall, ToolFunction},
+        types::{Message, MessageContent, Role, SessionTraceKind, ToolCall, ToolFunction},
     },
 };
 use http_body_util::BodyExt;
@@ -239,6 +242,30 @@ fn build_test_app<L>(config: Arc<AppConfig>, llm: Arc<L>) -> (Router, Arc<Sessio
 where
     L: CompressionLlm + ChatLlm + 'static,
 {
+    let (state, store) = build_test_state(config, llm);
+    (build_router(state), store)
+}
+
+fn build_test_api_app<L>(config: Arc<AppConfig>, llm: Arc<L>) -> (Router, Arc<SessionStore>)
+where
+    L: CompressionLlm + ChatLlm + 'static,
+{
+    let (state, store) = build_test_state(config, llm);
+    (build_api_router(state), store)
+}
+
+fn build_test_demo_app<L>(config: Arc<AppConfig>, llm: Arc<L>) -> (Router, Arc<SessionStore>)
+where
+    L: CompressionLlm + ChatLlm + 'static,
+{
+    let (state, store) = build_test_state(config, llm);
+    (build_demo_router(state), store)
+}
+
+fn build_test_state<L>(config: Arc<AppConfig>, llm: Arc<L>) -> (AppState, Arc<SessionStore>)
+where
+    L: CompressionLlm + ChatLlm + 'static,
+{
     let runtime = Arc::new(RwLock::new(DemoRuntimeConfig::from_app_config(&config)));
     let store = Arc::new(SessionStore::new(
         config.server.max_sessions,
@@ -268,7 +295,7 @@ where
         chat_llm,
     };
 
-    (build_router(state), store)
+    (state, store)
 }
 
 async fn call_json_owned(
@@ -707,6 +734,14 @@ async fn scenario_3_compression_timeout_degrades_and_merges_pending_without_loss
         .as_array()
         .expect("messages should be array");
     assert_eq!(messages.len(), 4);
+    let contents: Vec<&str> = messages
+        .iter()
+        .filter_map(|message| message["content"].as_str())
+        .collect();
+    assert!(contents.contains(&"u1"));
+    assert!(contents.contains(&"a1"));
+    assert!(contents.contains(&"u2"));
+    assert!(contents.contains(&"a2"));
 
     let has_summary = messages.iter().any(|message| {
         message["role"] == "system"
@@ -751,6 +786,11 @@ async fn scenario_4_append_during_compression_goes_to_pending_and_fetch_sees_ful
         .iter()
         .filter_map(|message| message["content"].as_str())
         .collect();
+    assert_eq!(body["stable_message_count"], 2);
+    assert_eq!(body["pending_message_count"], 2);
+    assert_eq!(messages.len(), 4);
+    assert!(contents.contains(&"u1"));
+    assert!(contents.contains(&"a1"));
     assert!(contents.contains(&"u2"));
     assert!(contents.contains(&"a2"));
 }
@@ -790,6 +830,184 @@ async fn scenario_5_successful_compression_results_in_summary_plus_pending_and_c
     assert!(guard.stable[0].is_context_summary());
     assert_eq!(guard.stable[1].content_text(), "u2");
     assert_eq!(guard.stable[2].content_text(), "a2");
+    let success_trace = guard
+        .traces
+        .iter()
+        .rev()
+        .find(|trace| trace.kind == SessionTraceKind::CompressionSucceeded)
+        .expect("compression success trace should exist");
+    assert!(success_trace.message.contains("prompt input 2 messages"));
+    assert!(success_trace
+        .message
+        .contains("compressed region 2 messages"));
+    assert!(success_trace.message.contains("stable output 1 messages"));
+    assert!(success_trace.message.contains("summary"));
+    assert!(success_trace.message.contains("retained 0 recent messages"));
+    let evaluation = guard
+        .last_compression_evaluation
+        .as_ref()
+        .expect("last compression evaluation should be stored");
+    assert_eq!(evaluation.prompt_input_message_count, 2);
+    assert_eq!(evaluation.compressed_region_message_count, 2);
+    assert_eq!(evaluation.stable_output_message_count, 1);
+    drop(guard);
+
+    let (status, body) = fetch_context(&app, &session_id).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body["last_compression_evaluation"]["prompt_input_message_count"],
+        2
+    );
+    assert_eq!(
+        body["last_compression_evaluation"]["compressed_region_message_count"],
+        2
+    );
+    assert_eq!(
+        body["last_compression_evaluation"]["stable_output_message_count"],
+        1
+    );
+}
+
+#[tokio::test]
+async fn scenario_oversized_compression_summary_degrades_without_loss() {
+    let config = make_config(1, 0, 2, 0, 3600);
+    let llm = Arc::new(MockLlm {
+        delay: Duration::ZERO,
+        outcome: MockOutcome::Success("x".repeat(10_000)),
+    });
+    let (app, store) = build_test_app(config, llm);
+
+    let session_id = create_session(&app).await;
+    let (status, _) = append_text(&app, &session_id, "user", "u1").await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, body) = append_text(&app, &session_id, "assistant", "a1").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["compression_triggered"], true);
+
+    wait_until_compression_finishes(&store, &session_id, Duration::from_secs(2)).await;
+
+    let (status, body) = fetch_context(&app, &session_id).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["summary_message_count"], 0);
+    assert!(body["last_compression_evaluation"].is_null());
+    let messages = body["messages"]
+        .as_array()
+        .expect("messages should be array");
+    assert!(messages
+        .iter()
+        .any(|message| message["role"] == "user" && message["content"] == "u1"));
+    assert!(messages
+        .iter()
+        .any(|message| message["role"] == "assistant" && message["content"] == "a1"));
+    let traces = body["traces"].as_array().expect("traces should be array");
+    assert!(traces
+        .iter()
+        .any(|trace| trace["kind"] == "compression_failed"
+            && trace["message"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("compression summary did not reduce compressed region")));
+}
+
+#[tokio::test]
+async fn scenario_fetch_after_compression_returns_summary_recent_detail_and_pending_detail() {
+    let config = make_config(2, 1, 2, 0, 3600);
+    let llm = Arc::new(MockLlm {
+        delay: Duration::from_millis(500),
+        outcome: MockOutcome::Success("summary for u1 a1".to_string()),
+    });
+    let (app, store) = build_test_app(config, llm);
+
+    let session_id = create_session(&app).await;
+
+    for (user_text, assistant_text) in [("u1", "a1"), ("u2", "a2")] {
+        let (status, _) = append_text(&app, &session_id, "user", user_text).await;
+        assert_eq!(status, StatusCode::OK);
+        let (status, body) = append_text(&app, &session_id, "assistant", assistant_text).await;
+        assert_eq!(status, StatusCode::OK);
+        if assistant_text == "a2" {
+            assert_eq!(body["compression_triggered"], true);
+        }
+    }
+
+    let (status, _) = append_text(&app, &session_id, "user", "u3").await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _) = append_text(&app, &session_id, "assistant", "a3").await;
+    assert_eq!(status, StatusCode::OK);
+
+    wait_until_compression_finishes(&store, &session_id, Duration::from_secs(4)).await;
+
+    let (status, body) = fetch_context(&app, &session_id).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["is_compressing"], false);
+    assert_eq!(body["stable_message_count"], 5);
+    assert_eq!(body["pending_message_count"], 0);
+    assert_eq!(body["summary_message_count"], 1);
+
+    let messages = body["messages"]
+        .as_array()
+        .expect("messages should be array");
+    assert_eq!(messages.len(), 5);
+
+    let contents: Vec<&str> = messages
+        .iter()
+        .filter_map(|message| message["content"].as_str())
+        .collect();
+    assert!(
+        contents
+            .iter()
+            .any(|text| text.starts_with("[CONTEXT SUMMARY]") && text.contains("summary for u1 a1")),
+        "compressed older detail should be represented by summary"
+    );
+    assert!(contents.contains(&"u2"));
+    assert!(contents.contains(&"a2"));
+    assert!(contents.contains(&"u3"));
+    assert!(contents.contains(&"a3"));
+    assert!(!contents.contains(&"u1"));
+    assert!(!contents.contains(&"a1"));
+}
+
+#[tokio::test]
+async fn scenario_stale_compression_result_does_not_overwrite_changed_stable_context() {
+    let config = make_config(1, 0, 2, 0, 3600);
+    let llm = Arc::new(MockLlm {
+        delay: Duration::from_millis(300),
+        outcome: MockOutcome::Success("stale summary".to_string()),
+    });
+    let (app, store) = build_test_app(config, llm);
+
+    let session_id = create_session(&app).await;
+    let (status, _) = append_text(&app, &session_id, "user", "u1").await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, body) = append_text(&app, &session_id, "assistant", "a1").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["compression_triggered"], true);
+
+    {
+        let session = store.get(&session_id).expect("session should exist");
+        let mut guard = session.write().await;
+        guard.stable.push(Message::text(
+            Role::System,
+            "stable changed while compressing",
+        ));
+        guard.stable_revision = guard.stable_revision.saturating_add(1);
+    }
+
+    wait_until_compression_finishes(&store, &session_id, Duration::from_secs(2)).await;
+
+    let (status, body) = fetch_context(&app, &session_id).await;
+    assert_eq!(status, StatusCode::OK);
+    let messages = body["messages"]
+        .as_array()
+        .expect("messages should be array");
+    assert!(
+        messages.iter().any(|message| message["content"]
+            .as_str()
+            .map(|content| content == "stable changed while compressing")
+            .unwrap_or(false)),
+        "stable mutation should be preserved"
+    );
+    assert_eq!(body["summary_message_count"], 0);
 }
 
 #[tokio::test]
@@ -831,6 +1049,31 @@ async fn scenario_7_ttl_expiration_removes_session_and_later_access_recreates_it
 }
 
 #[tokio::test]
+async fn scenario_ttl_cleanup_skips_session_while_compressing() {
+    let config = make_config(100, 2, 2, 0, 1);
+    let llm = Arc::new(MockLlm {
+        delay: Duration::ZERO,
+        outcome: MockOutcome::Success("unused".to_string()),
+    });
+    let (app, store) = build_test_app(config, llm);
+    store.clone().spawn_ttl_cleanup_with_interval(1);
+
+    let session_id = create_session(&app).await;
+    let session = store.get(&session_id).expect("session should exist");
+    {
+        let guard = session.write().await;
+        guard.is_compressing.store(true, Ordering::SeqCst);
+    }
+
+    sleep(Duration::from_secs(3)).await;
+
+    assert!(
+        store.get(&session_id).is_some(),
+        "ttl cleanup must not remove a session while compression is in progress"
+    );
+}
+
+#[tokio::test]
 async fn scenario_fetch_context_refreshes_last_accessed() {
     let config = make_config(100, 2, 2, 0, 3600);
     let llm = Arc::new(MockLlm {
@@ -860,6 +1103,33 @@ async fn scenario_fetch_context_refreshes_last_accessed() {
         after > before,
         "fetching context should refresh session last_accessed"
     );
+}
+
+#[tokio::test]
+async fn scenario_fetch_context_exposes_compression_windows() {
+    let config = make_config(5, 2, 2, 0, 3600);
+    let llm = Arc::new(MockLlm {
+        delay: Duration::ZERO,
+        outcome: MockOutcome::Success("unused".to_string()),
+    });
+    let (app, _store) = build_test_app(config, llm);
+
+    let session_id = create_session(&app).await;
+    let (status, body) = fetch_context(&app, &session_id).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["next_compress_at"], 5);
+    assert_eq!(body["turns_until_compression"], 5);
+
+    let (status, _) = append_text(&app, &session_id, "user", "hello").await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _) = append_text(&app, &session_id, "assistant", "world").await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, body) = fetch_context(&app, &session_id).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["turn_count"], 1);
+    assert_eq!(body["next_compress_at"], 5);
+    assert_eq!(body["turns_until_compression"], 4);
 }
 
 #[tokio::test]
@@ -896,6 +1166,7 @@ async fn scenario_8_tool_call_chain_crossing_stable_and_pending_boundary_is_vali
                 name: None,
             },
         ];
+        guard.stable_revision = guard.stable_revision.saturating_add(1);
         guard.pending.clear();
         guard.turn_count = 0;
         guard.next_compress_at = 1;
@@ -1126,6 +1397,7 @@ async fn scenario_compressor_route_serves_chat_and_metrics_shell() {
     assert!(body.contains("Settings"));
     assert!(body.contains("Compression Strategy"));
     assert!(body.contains("Conversation Model"));
+    assert!(body.contains("Next Compression"));
     assert!(body.contains("Current Session"));
     assert!(body.contains("Session Cache"));
     assert!(body.contains("Create Session"));
@@ -1193,6 +1465,48 @@ async fn scenario_demo_routes_and_permissive_cors_can_be_disabled() {
         headers.get(ACCESS_CONTROL_ALLOW_ORIGIN).is_none(),
         "disabled permissive CORS should not add access-control-allow-origin"
     );
+}
+
+#[tokio::test]
+async fn scenario_api_router_exposes_core_routes_only() {
+    let config = make_config_with_server_flags(true, true);
+    let llm = Arc::new(MockLlm {
+        delay: Duration::ZERO,
+        outcome: MockOutcome::Success("api only".to_string()),
+    });
+    let (app, _store) = build_test_api_app(config, llm);
+
+    let (status, _) = call_json(&app, Method::GET, "/health", None).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, _) = call_json(&app, Method::POST, "/sessions", Some(json!({}))).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, _) = call_text(&app, Method::GET, "/compressor").await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+
+    let (status, _) = call_text(&app, Method::GET, "/demo/config").await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn scenario_demo_router_serves_ui_and_keeps_core_api_available() {
+    let config = make_config_with_server_flags(false, true);
+    let llm = Arc::new(MockLlm {
+        delay: Duration::ZERO,
+        outcome: MockOutcome::Success("demo service".to_string()),
+    });
+    let (app, _store) = build_test_demo_app(config, llm);
+
+    let (status, body) = call_text(&app, Method::GET, "/compressor").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(body.contains("ctx-cache-compressor Demo Console"));
+
+    let (status, _) = call_json(&app, Method::GET, "/demo/config", None).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, _) = call_json(&app, Method::POST, "/sessions", Some(json!({}))).await;
+    assert_eq!(status, StatusCode::OK);
 }
 
 #[tokio::test]
@@ -1379,6 +1693,46 @@ async fn scenario_demo_tool_call_uses_tool_definition_and_appends_assistant_call
         .expect("messages should be array");
     assert!(messages.iter().any(|message| message["role"] == "assistant"
         && message["tool_calls"][0]["function"]["name"] == "set_volume"));
+}
+
+#[tokio::test]
+async fn scenario_demo_tool_call_persists_user_before_llm_failure() {
+    let config = make_config(2, 1, 2, 0, 3600);
+    let llm = Arc::new(MockLlm {
+        delay: Duration::ZERO,
+        outcome: MockOutcome::Error("tool model failed".to_string()),
+    });
+    let (app, _store) = build_test_app(config, llm);
+    let session_id = create_session(&app).await;
+
+    let (status, _body) = call_json(
+        &app,
+        Method::POST,
+        "/demo/tool-call",
+        Some(json!({
+            "session_id": session_id,
+            "user_message": "声音设置为30",
+            "tools": [{
+                "type": "function",
+                "function": {
+                    "name": "set_volume",
+                    "parameters": { "type": "object" }
+                }
+            }]
+        })),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::BAD_GATEWAY);
+
+    let (status, body) = fetch_context(&app, &session_id).await;
+    assert_eq!(status, StatusCode::OK);
+    let messages = body["messages"]
+        .as_array()
+        .expect("messages should be array");
+    assert!(messages
+        .iter()
+        .any(|message| message["role"] == "user" && message["content"] == "声音设置为30"));
 }
 
 #[tokio::test]

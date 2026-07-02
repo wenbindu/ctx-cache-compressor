@@ -81,6 +81,23 @@
 - `fetch` 不阻塞
 - 后台压缩不会丢失进行中的新消息
 
+具体运行方式：
+
+- 普通追加写入 `stable`
+- 触发压缩时，服务对 `stable` 做快照，并把 session 标记为压缩中
+- 压缩期间的新消息写入 `pending`
+- fetch 始终返回 `stable + pending`
+- 压缩成功后，用 `[summary] + 最近原文轮次` 替换旧的 `stable` 快照，再把 `pending` 合并回 `stable`
+- 压缩失败时，保留旧 `stable`，并把 `pending` 合并回去
+- 如果后台压缩运行期间 `stable` 被其他路径改动，过期压缩结果会被丢弃，避免覆盖新状态
+
+fetch API 在任何时刻都返回完整的规范化上下文：
+
+- 压缩前：原始详细轮次
+- 压缩中：旧的原始 `stable` 快照 + 详细 `pending` 消息
+- 压缩成功后：较早轮次的 `[CONTEXT SUMMARY]` + 最近详细轮次 + 已合并的详细 pending 消息
+- 压缩失败或结果被丢弃后：旧的详细 `stable` + 已合并的详细 `pending`
+
 ## 4. 路由分组
 
 ### 核心接口
@@ -106,9 +123,16 @@
 - `/ex/dashboard`
 - `/ex/playground`
 
-Demo 与 UI 路由由 `server.enable_demo_routes` 控制。生产配置通常应关闭这些路由，只暴露核心 API。
+兼容二进制里的 Demo 与 UI 路由由 `server.enable_demo_routes` 控制。
+生产部署通常应运行 `ctx-cache-compressor-api`，它只暴露核心 API。
 `/demo/tool-call` 接收 OpenAI 兼容的 `tools` 数组，用于 playground tool 模拟。
 `/demo/complete` 在手动追加 tool 结果后继续生成最终 assistant 回复。
+
+可部署入口：
+
+- `ctx-cache-compressor`：兼容服务，核心 API 加可选 demo/UI
+- `ctx-cache-compressor-api`：生产 API-only 服务
+- `ctx-cache-compressor-demo`：本地 demo/display 服务
 
 ## 5. 推荐理解方式
 

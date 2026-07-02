@@ -27,13 +27,14 @@ pub async fn fetch_context_response(
         is_compressing,
         turn_count,
         compressed_turns,
+        next_compress_at,
         stable_message_count,
         pending_message_count,
+        last_compression_evaluation,
     ) = {
         let mut guard = session.write().await;
         guard.touch();
-        let mut messages = guard.stable.clone();
-        messages.extend(guard.pending.clone());
+        let messages = guard.full_messages();
 
         (
             messages,
@@ -41,8 +42,10 @@ pub async fn fetch_context_response(
             guard.is_compressing.load(Ordering::Relaxed),
             guard.turn_count,
             guard.compressed_turns,
+            guard.next_compress_at,
             guard.stable.len(),
             guard.pending.len(),
+            guard.last_compression_evaluation.clone(),
         )
     };
 
@@ -79,11 +82,14 @@ pub async fn fetch_context_response(
         turn_count,
         is_compressing,
         compressed_turns,
+        next_compress_at,
+        turns_until_compression: next_compress_at.saturating_sub(turn_count),
         token_estimate,
         stable_message_count,
         pending_message_count,
         summary_message_count: summary_messages.len(),
         latest_summary_preview,
+        last_compression_evaluation,
         last_compression_triggered_at,
         last_compression_finished_at,
         traces,

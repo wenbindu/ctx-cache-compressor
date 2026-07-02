@@ -81,6 +81,23 @@ That design allows:
 - non-blocking `fetch`
 - background compression without losing in-flight messages
 
+Operationally:
+
+- normal appends go into `stable`
+- when compression starts, it takes a snapshot of `stable` and marks the session as compressing
+- appends during compression go into `pending`
+- fetch always returns `stable + pending`
+- on compression success, the service replaces the old `stable` snapshot with `[summary] + recent raw turns`, then drains `pending` into `stable`
+- on compression failure, the service keeps the old `stable` and drains `pending` into it
+- if `stable` changes while a background compression task is running, the stale compression result is discarded before it can overwrite newer state
+
+The fetch API returns the complete canonical context at every moment:
+
+- before compression: raw detailed turns
+- during compression: the old raw `stable` snapshot plus detailed `pending` messages
+- after successful compression: `[CONTEXT SUMMARY]` for older turns plus recent and pending detailed messages
+- after failed or discarded compression: the previous detailed `stable` plus merged detailed `pending`
+
 ## 4. Route Groups
 
 ### Core routes
@@ -106,11 +123,18 @@ That design allows:
 - `/ex/dashboard`
 - `/ex/playground`
 
-Demo and UI routes are controlled by `server.enable_demo_routes`. Production
-configs should usually keep them disabled and expose only the core API.
+Demo and UI routes are controlled by `server.enable_demo_routes` in the
+compatibility binary. Production deployments should usually run
+`ctx-cache-compressor-api`, which exposes only the core API.
 `/demo/tool-call` accepts an OpenAI-compatible `tools` array for playground tool
 simulation. `/demo/complete` continues after a manual tool result has already
 been appended.
+
+Deployable entrypoints:
+
+- `ctx-cache-compressor`: compatibility service, core API plus optional demo/UI
+- `ctx-cache-compressor-api`: production API-only service
+- `ctx-cache-compressor-demo`: local demo/display service
 
 ## 5. Recommended Mental Model
 

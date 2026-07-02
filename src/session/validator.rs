@@ -56,6 +56,7 @@ fn is_transition_allowed(prev: NodeState, next: NodeState) -> bool {
             | (NodeState::User, NodeState::AssistantFinal)
             | (NodeState::AssistantToolCalls, NodeState::Tool)
             | (NodeState::Tool, NodeState::Tool)
+            | (NodeState::Tool, NodeState::AssistantToolCalls)
             | (NodeState::Tool, NodeState::AssistantFinal)
             | (NodeState::AssistantFinal, NodeState::User)
     )
@@ -91,6 +92,14 @@ fn validate_tool_fields(existing_messages: &[Message], incoming: &Message) -> Re
             }
         }
         Role::Assistant => {
+            let unresolved = unresolved_tool_call_ids(existing_messages);
+            if !unresolved.is_empty() {
+                return Err(AppError::BadRequest(format!(
+                    "assistant message requires pending tool_call result(s) first: {}",
+                    unresolved.join(", ")
+                )));
+            }
+
             if let Some(tool_calls) = incoming.tool_calls.as_ref() {
                 if tool_calls.is_empty() {
                     return Err(AppError::BadRequest(
@@ -139,6 +148,17 @@ fn collect_resolved_tool_call_ids(messages: &[Message]) -> HashSet<&str> {
         .collect()
 }
 
+fn unresolved_tool_call_ids(messages: &[Message]) -> Vec<&str> {
+    let issued_calls = collect_issued_tool_call_ids(messages);
+    let resolved_calls = collect_resolved_tool_call_ids(messages);
+    let mut unresolved = issued_calls
+        .into_iter()
+        .filter(|call_id| !resolved_calls.contains(call_id))
+        .collect::<Vec<_>>();
+    unresolved.sort_unstable();
+    unresolved
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -178,7 +198,39 @@ mod tests {
         }
     }
 
+    fn assistant_two_tool_calls() -> Message {
+        Message {
+            role: Role::Assistant,
+            content: None,
+            reasoning_content: None,
+            tool_calls: Some(vec![
+                ToolCall {
+                    id: "call_1".to_string(),
+                    call_type: "function".to_string(),
+                    function: ToolFunction {
+                        name: "search".to_string(),
+                        arguments: "{}".to_string(),
+                    },
+                },
+                ToolCall {
+                    id: "call_2".to_string(),
+                    call_type: "function".to_string(),
+                    function: ToolFunction {
+                        name: "lookup".to_string(),
+                        arguments: "{}".to_string(),
+                    },
+                },
+            ]),
+            tool_call_id: None,
+            name: None,
+        }
+    }
+
     fn tool_msg() -> Message {
+        tool_msg_with_id("call_1")
+    }
+
+    fn tool_msg_with_id(call_id: &str) -> Message {
         Message {
             role: Role::Tool,
             content: Some(crate::session::types::MessageContent::Text(
@@ -186,7 +238,7 @@ mod tests {
             )),
             reasoning_content: None,
             tool_calls: None,
-            tool_call_id: Some("call_1".to_string()),
+            tool_call_id: Some(call_id.to_string()),
             name: Some("search".to_string()),
         }
     }
@@ -227,6 +279,25 @@ mod tests {
 
         let existing = vec![user_msg(), assistant_tool_call(), tool_msg()];
         assert!(validate_append(&existing, &assistant_final()).is_ok());
+    }
+
+    #[test]
+    fn tool_chain_allows_second_tool_call_after_result() {
+        let existing = vec![user_msg(), assistant_tool_call(), tool_msg()];
+        assert!(validate_append(&existing, &assistant_tool_call_with_id("call_2")).is_ok());
+    }
+
+    #[test]
+    fn assistant_rejects_when_previous_tool_calls_are_unresolved() {
+        let existing = vec![
+            user_msg(),
+            assistant_two_tool_calls(),
+            tool_msg_with_id("call_1"),
+        ];
+        let err = validate_append(&existing, &assistant_final()).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("assistant message requires pending tool_call result"));
     }
 
     #[test]

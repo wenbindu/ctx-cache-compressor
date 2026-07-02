@@ -35,6 +35,12 @@ Reference: [src/api/routes.rs](../src/api/routes.rs#L21)
 
 ## 2. Current Frontend Call Map
 
+The service now has explicit deployable entrypoints:
+
+- `ctx-cache-compressor-api`: core API routes only
+- `ctx-cache-compressor-demo`: local demo/display routes plus core routes for a self-contained playground
+- `ctx-cache-compressor`: compatibility entrypoint, controlled by `server.enable_demo_routes`
+
 The current playground and dashboard do not call all session APIs directly for chat. They follow a lightweight operator loop:
 
 1. On load:
@@ -285,8 +291,9 @@ Current internal path:
 5. estimate tokens from message characters
 6. count summary messages
 7. build `latest_summary_preview`
-8. derive last compression trigger time from traces
-9. derive last compression finish time from traces
+8. copy `last_compression_evaluation` when a successful compression has run
+9. derive last compression trigger time from traces
+10. derive last compression finish time from traces
 
 Reference: [src/api/handlers/fetch.rs](../src/api/handlers/fetch.rs#L15)
 
@@ -297,11 +304,14 @@ Current response:
 - `turn_count`
 - `is_compressing`
 - `compressed_turns`
+- `next_compress_at`
+- `turns_until_compression`
 - `token_estimate`
 - `stable_message_count`
 - `pending_message_count`
 - `summary_message_count`
 - `latest_summary_preview`
+- `last_compression_evaluation`
 - `last_compression_triggered_at`
 - `last_compression_finished_at`
 - `traces`
@@ -424,10 +434,12 @@ Current internal path:
 3. scheduler spawns `compress_task`
 4. compressor plans the split:
    - preserve initial non-summary system prompt
+   - pass the existing context summary as rolling summary input when present
    - compress older completed turns
    - keep the most recent `keep_recent_turns`
 5. compression LLM is called with generated system/user prompts
 6. on success:
+   - discard the result if the stable snapshot revision changed during compression
    - replace `stable` with `[preserved head] + [summary] + [recent tail]`
    - drain `pending` into `stable`
    - increment `compressed_turns`
@@ -532,18 +544,19 @@ Already available:
 
 - `is_compressing`
 - `compressed_turns`
+- `next_compress_at`
+- `turns_until_compression`
 - `stable_message_count`
 - `pending_message_count`
 - `summary_message_count`
 - `latest_summary_preview`
 - `last_compression_triggered_at`
 - `last_compression_finished_at`
+- `last_compression_evaluation`
 - compression-related traces
 
 Worth adding next:
 
-- `next_compress_at`
-- `turns_until_compression`
 - `last_compression_status`
 - `last_compression_latency_ms`
 - `last_compression_attempts`
@@ -552,6 +565,11 @@ Worth adding next:
 - `snapshot_token_estimate`
 - `post_compression_token_estimate`
 - compression ratio
+
+`last_compression_evaluation` currently exposes the latest successful compression
+metrics as structured data: prompt input messages/chars, compressed region
+messages/chars, stable output messages/chars, summary chars, retained recent
+messages, and whether a previous rolling summary was included.
 
 ### 6.5 Runtime / Config-Level
 

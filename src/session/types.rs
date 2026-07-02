@@ -131,6 +131,29 @@ impl Message {
 
         total
     }
+
+    pub fn estimated_compression_visible_char_len(&self) -> usize {
+        let mut total = self.content_text().chars().count();
+
+        if let Some(tool_calls) = self.tool_calls.as_ref() {
+            for call in tool_calls {
+                total += call.id.chars().count();
+                total += call.call_type.chars().count();
+                total += call.function.name.chars().count();
+                total += call.function.arguments.chars().count();
+            }
+        }
+
+        if let Some(tool_call_id) = self.tool_call_id.as_ref() {
+            total += tool_call_id.chars().count();
+        }
+
+        if let Some(name) = self.name.as_ref() {
+            total += name.chars().count();
+        }
+
+        total
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -159,16 +182,31 @@ pub struct SessionTraceEvent {
     pub pending_count: usize,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CompressionEvaluationSnapshot {
+    pub prompt_input_message_count: usize,
+    pub prompt_input_char_count: usize,
+    pub compressed_region_message_count: usize,
+    pub compressed_region_char_count: usize,
+    pub stable_output_message_count: usize,
+    pub stable_output_char_count: usize,
+    pub summary_char_count: usize,
+    pub retained_recent_message_count: usize,
+    pub previous_summary_included: bool,
+}
+
 #[derive(Debug)]
 pub struct Session {
     pub id: String,
     pub stable: Vec<Message>,
     pub pending: Vec<Message>,
+    pub stable_revision: u64,
     pub traces: Vec<SessionTraceEvent>,
     pub is_compressing: AtomicBool,
     pub turn_count: u32,
     pub compressed_turns: u32,
     pub next_compress_at: u32,
+    pub last_compression_evaluation: Option<CompressionEvaluationSnapshot>,
     pub created_at: DateTime<Utc>,
     pub last_accessed: DateTime<Utc>,
 }
@@ -186,11 +224,13 @@ impl Session {
             id,
             stable,
             pending: Vec::new(),
+            stable_revision: 0,
             traces: Vec::new(),
             is_compressing: AtomicBool::new(false),
             turn_count: 0,
             compressed_turns: 0,
             next_compress_at: every_n_turns.max(1),
+            last_compression_evaluation: None,
             created_at: now,
             last_accessed: now,
         };

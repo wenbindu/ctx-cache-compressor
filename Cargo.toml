@@ -2,6 +2,7 @@
 name = "ctx-cache-compressor"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
 
 [dependencies]
 axum = { version = "0.8", features = ["macros"] }
@@ -22,6 +23,18 @@ uuid = { version = "1", features = ["v4", "serde"] }
 
 [dev-dependencies]
 http-body-util = "0.1"
+
+[[bin]]
+name = "ctx-cache-compressor"
+path = "src/main.rs"
+
+[[bin]]
+name = "ctx-cache-compressor-api"
+path = "src/bin/api.rs"
+
+[[bin]]
+name = "ctx-cache-compressor-demo"
+path = "src/bin/demo.rs"
 
 [profile.release]
 opt-level = 3

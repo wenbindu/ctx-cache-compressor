@@ -4,7 +4,11 @@ pub fn should_trigger_compression(
     turn_count: u32,
     next_compress_at: u32,
 ) -> bool {
-    turn_completed && at_turn_boundary && turn_count >= next_compress_at
+    if !turn_completed || !at_turn_boundary {
+        return false;
+    }
+
+    turn_count >= next_compress_at
 }
 
 #[cfg(test)]
